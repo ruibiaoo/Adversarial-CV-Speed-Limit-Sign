@@ -1,0 +1,15 @@
+# Filtered YOLO dataset: 10-70 MPH in increments of 10.
+path: .
+train: images
+val: images
+
+names:
+  - "10 MPH"
+  - "20 MPH"
+  - "30 MPH"
+  - "40 MPH"
+  - "50 MPH"
+  - "60 MPH"
+  - "70 MPH"
+
+nc: 7
