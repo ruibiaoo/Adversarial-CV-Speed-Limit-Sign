@@ -34,7 +34,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 RUN pip install --no-cache-dir ultralytics==8.4.146 "ray[tune]" optuna wandb
 # Copy source scripts into container
-COPY train.py run.sh tuning_config.py wandb_config.py config.yaml tuner.yaml ./
+COPY train.py run.sh config.yaml tuner.yaml ./
+COPY modules/ ./modules/
 RUN chmod +x run.sh
 
 # Default execution entrypoint

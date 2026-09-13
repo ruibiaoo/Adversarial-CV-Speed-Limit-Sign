@@ -5,6 +5,7 @@ use_ray: True
 data: "/app/data"
 epochs: 50
 name: "yolo26_speed_limit_tune"
+# model: "yolo26n-cls.pt"
 seed: 0
 space:
   lr0:
@@ -33,10 +34,32 @@ space:
     type: uniform
     min: 0.5
     max: 2.0
+  optimizer:
+    type: choice
+    values: [SGD, Adam, AdamW, SGD]
 grace_period: 10
 gpu_per_trial: 1
 iterations: 200
 search_alg: "optuna"
-wandb:
+wandb: # dont change
   project: adversarial-cv-speed-limit-sign
   entity: hongyaok-hongyaok
+
+
+# augmentations, dont change, keep as same as config.yaml
+hsv_h: 0.1
+hsv_s: 0.5
+hsv_v: 0.5
+degrees: 30
+translate: 0.1
+scale: 0.1
+shear: 5
+perspective: 0.0005
+flipud: 0
+fliplr: 0
+bgr: 0.5
+mosaic: 0
+mixup: 0
+cutmix: 0
+copy_paste: 0
+erasing: 0.25
