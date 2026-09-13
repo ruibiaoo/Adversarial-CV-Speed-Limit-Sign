@@ -220,3 +220,7 @@ __marimo__/
 skills-lock.json
 docs/*
 .superpowers/*
+
+# Hyperparameter tuning results
+Phase_1/tuning/
+tuning/

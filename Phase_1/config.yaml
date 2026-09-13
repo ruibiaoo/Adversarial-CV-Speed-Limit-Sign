@@ -3,6 +3,7 @@
 # training
 data: "/app/data"
 epochs: 50
+workers: 0 # Load data in the training process to reduce RAM usage.
 imgsz: 640
 device: 0
 project: "/app/runs"

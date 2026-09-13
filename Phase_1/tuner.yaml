@@ -3,7 +3,8 @@
 tuner: True
 use_ray: True
 data: "/app/data"
-epochs: 50
+epochs: 25
+workers: 0 # Load data in the training process to reduce RAM usage.
 name: "yolo26_speed_limit_tune"
 # model: "yolo26n-cls.pt"
 seed: 0
