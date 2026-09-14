@@ -222,5 +222,7 @@ docs/*
 .superpowers/*
 
 # Hyperparameter tuning results
-Phase_1/tuning/
-tuning/
+Phase_1/tuning/classify/
+Phase_1/tuning/detect/
+tuning/classify/
+tuning/detect/
