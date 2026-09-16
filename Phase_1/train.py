@@ -6,11 +6,11 @@ import yaml
 if __package__:
     from .modules.tuning_config import prepare_tuning_arguments
     from .modules.tuning_results import save_tuning_results
-    from .modules.wandb_config import rename_wandb_runs
+    from .modules.wandb_config import log_test_metrics, prepare_wandb_training, rename_wandb_runs
 else:
     from modules.tuning_config import prepare_tuning_arguments
     from modules.tuning_results import save_tuning_results
-    from modules.wandb_config import rename_wandb_runs
+    from modules.wandb_config import log_test_metrics, prepare_wandb_training, rename_wandb_runs
 
 
 def load_config(path):
@@ -26,10 +26,13 @@ def main():
 
     if tuning:
         tuning_arguments = prepare_tuning_arguments(tuner_config)
+        track = True
+    else:
+        track = prepare_wandb_training(config)
 
     # Set integrations before YOLO loads its training callbacks.
 
-    settings.update({"wandb": tuning, "raytune": tuning})
+    settings.update({"wandb": track, "raytune": tuning})
     if tuning:
         settings.update({"runs_dir": str(phase_directory / "tuning")})
 
@@ -46,6 +49,8 @@ def main():
     test_metrics = model.val(data=config["data"], split="test")
     print(f"Top-1 Accuracy: {test_metrics.top1:.4f}")
     print(f"Top-5 Accuracy: {test_metrics.top5:.4f}")
+    if track:
+        log_test_metrics(test_metrics)
     return results
 
 

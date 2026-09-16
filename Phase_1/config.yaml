@@ -9,7 +9,9 @@ device: 0
 project: "/app/runs"
 name: "yolo26_speed_limit"
 
-#lr and optimisers to be implemented
+wandb: # dont change
+  project: adversarial-cv-speed-limit-sign
+  entity: hongyaok-hongyaok
 
 # augmentations
 # see https://docs.ultralytics.com/guides/yolo-data-augmentation

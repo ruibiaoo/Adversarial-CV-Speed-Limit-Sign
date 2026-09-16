@@ -20,13 +20,13 @@ Each Ray trial is recorded as a W&B run, while Ray Tune and Optuna remain respon
 
 - `train.py` reads both YAML files and checks `tuner` in `tuner.yaml`.
 - With `tuner: true`, it prepares the search space and calls `model.tune()`.
-- With `tuner: false`, it calls `model.train()` using `config.yaml`, then prints test top-1 and top-5 accuracy. W&B and Ray reporting are disabled in this mode.
+- With `tuner: false`, it calls `model.train()` using `config.yaml`, then prints test top-1 and top-5 accuracy. Training is tracked in W&B, and test top-1/top-5 are logged too.
 - `modules/tuning_config.py` converts the YAML `uniform` and `choice` entries into Ray search values.
-- `modules/wandb_config.py` checks the W&B settings and sets the project and entity environment variables.
+- `modules/wandb_config.py` checks the W&B settings and sets the project and entity environment variables. Training uses `prepare_wandb_training()` and `log_test_metrics()`.
 
 ## W&B setup
 
-Keep the API key in `.env` for Docker Compose and the project and entity under `wandb` in `tuner.yaml`. You can also supply the entity through `WANDB_ENTITY`. When running Python directly, set `WANDB_API_KEY` in your shell first; Python does not automatically read `.env`.
+Keep the API key in `.env` for Docker Compose and the project and entity under `wandb` in `tuner.yaml` for tuning and `config.yaml` for training. You can also supply the entity through `WANDB_ENTITY`. When running Python directly, set `WANDB_API_KEY` in your shell first; Python does not automatically read `.env`.
 
 Ultralytics provides a Python function for enabling its integrations:
 
