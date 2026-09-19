@@ -1,56 +1,58 @@
-# tuning --> if true, will use raytune to do hyperparam tuning
-# see https://docs.ultralytics.com/integrations/ray-tune
-tuner: True
-use_ray: True
+# tuning --> if true, will run a wandb sweep for hyperparam tuning
+# see https://docs.wandb.ai/guides/sweeps
+tuner: false
+method: bayes
+metric:
+  name: val_macro_f1
+  goal: maximize
 data: "/app/data"
-epochs: 25
+model_name: "resnet50"
+epochs: 30
 workers: 0 # Load data in the training process to reduce RAM usage.
-name: "yolo26_speed_limit_tune"
-# model: "yolo26n-cls.pt"
-seed: 0
+name: "resnet50_speed_limit_tune"
+pretrained: true # use imagenet weights
+optimizer: adam
+seed: 4266
+iterations: 50
+freeze_backbone: false
 space:
-  lr0:
-    type: uniform
-    min: 0.00001
-    max: 0.1
-  lrf:
-    type: uniform
-    min: 0.01
-    max: 0.5
+  learning_rate:
+    type: choice
+    values: [0.00001, 0.00003, 0.0001, 0.0003, 0.001]
   batch:
     type: choice
-    values: [4, 8, 16, 32]
-  imgsz:
+    values: [16, 32]
+  image_size:
     type: choice
-    values: [320, 416, 512, 640]
-  momentum:
-    type: uniform
-    min: 0.8
-    max: 0.99
+    values: [160, 224, 256]
   weight_decay:
-    type: uniform
-    min: 0.0001
-    max: 0.1
-  cls:
-    type: uniform
-    min: 0.5
-    max: 2.0
-  optimizer:
     type: choice
-    values: [SGD, Adam, AdamW, SGD]
-grace_period: 10
-gpu_per_trial: 1
-iterations: 200
-search_alg: "optuna"
+    values: [0, 0.00001, 0.0001, 0.0005]
+  dropout:
+    type: choice
+    values: [0, 0.1, 0.2, 0.3, 0.4]
+  reduce_lr_factor:
+    type: choice
+    values: [0.2, 0.3, 0.5]
+  reduce_lr_patience:
+    type: choice
+    values: [2, 3, 4]
+  early_stopping_patience:
+    type: choice
+    values: [5, 6, 8, 10]
+  min_learning_rate:
+    type: choice
+    values: [0.0000001, 0.000001, 0.000005, 0.00001]
 wandb: # dont change
   project: adversarial-cv-speed-limit-sign
   entity: hongyaok-hongyaok
 
-
 # augmentations, dont change, keep as same as config.yaml
-hsv_h: 0.1
-hsv_s: 0.5
-hsv_v: 0.5
+# these are fixed, never swept
+augment: true # fixed, true = use augments, false = train same as val/test (ie no augs)
+hsv_h: 0.02
+hsv_s: 0.1
+hsv_v: 0.1
 degrees: 30
 translate: 0.1
 scale: 0.1
@@ -58,9 +60,10 @@ shear: 5
 perspective: 0.0005
 flipud: 0
 fliplr: 0
-bgr: 0.5
+bgr: 0 # changing the channels, i personally dont recc
+grayscale: 0.05
 mosaic: 0
 mixup: 0
 cutmix: 0
 copy_paste: 0
-erasing: 0.25
+erasing: 0

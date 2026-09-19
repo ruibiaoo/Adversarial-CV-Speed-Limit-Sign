@@ -15,14 +15,12 @@ Key Features:
 
 import argparse
 import os
-import re
 import random
+import re
 import shutil
-import sys
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import yaml
 from PIL import Image, ImageOps
@@ -43,28 +41,26 @@ def get_base_name(filename: str) -> str:
     # Strip .rf.<hash> if present
     base = re.sub(r"\.rf\.[a-f0-9]+", "", stem, flags=re.IGNORECASE)
     # Strip double extension artifacts (e.g. '0000005_jpg')
-    base = re.sub(r"_(jpg|jpeg|png)$", "", base, flags=re.IGNORECASE)
-    return base
+    return re.sub(r"_(jpg|jpeg|png)$", "", base, flags=re.IGNORECASE)
 
 
-def load_yaml_names(yaml_path: str) -> Dict[int, str]:
+def load_yaml_names(yaml_path: str) -> dict[int, str]:
     """Loads class index to name mapping from a YOLO data.yaml file."""
     if not os.path.exists(yaml_path):
         raise FileNotFoundError(f"data.yaml not found at: {yaml_path}")
     
-    with open(yaml_path, "r", encoding="utf-8") as f:
+    with open(yaml_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     
     raw_names = data.get("names", [])
     if isinstance(raw_names, list):
         return {i: str(name) for i, name in enumerate(raw_names)}
-    elif isinstance(raw_names, dict):
+    if isinstance(raw_names, dict):
         return {int(k): str(v) for k, v in raw_names.items()}
-    else:
-        raise ValueError(f"Unexpected 'names' format in {yaml_path}: {type(raw_names)}")
+    raise ValueError(f"Unexpected 'names' format in {yaml_path}: {type(raw_names)}")
 
 
-def parse_label_file(label_path: str) -> List[Tuple[int, Tuple[float, float, float, float]]]:
+def parse_label_file(label_path: str) -> list[tuple[int, tuple[float, float, float, float]]]:
     """
     Parses a YOLO annotation file. Supports:
     1. Standard 5-token YOLO bounding box: <class_id> <xc> <yc> <w> <h>
@@ -75,7 +71,7 @@ def parse_label_file(label_path: str) -> List[Tuple[int, Tuple[float, float, flo
     if not os.path.exists(label_path):
         return boxes
 
-    with open(label_path, "r", encoding="utf-8") as f:
+    with open(label_path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -114,7 +110,7 @@ def parse_label_file(label_path: str) -> List[Tuple[int, Tuple[float, float, flo
     return boxes
 
 
-def crop_single_task(task_args: dict) -> Tuple[bool, str]:
+def crop_single_task(task_args: dict) -> tuple[bool, str]:
     """
     Worker task to crop and save sign images from one source image.
     Args dictionary contains:
@@ -128,7 +124,7 @@ def crop_single_task(task_args: dict) -> Tuple[bool, str]:
     boxes = task_args["boxes"]
     dest_dirs = task_args["dest_dirs"]
     padding = task_args.get("padding", 0.0)
-    target_size = task_args.get("target_size", None)
+    target_size = task_args.get("target_size")
 
     try:
         with Image.open(img_path) as im:
@@ -158,10 +154,10 @@ def crop_single_task(task_args: dict) -> Tuple[bool, str]:
                     px_ymax = min(float(img_h), px_ymax + pad_y)
 
                 crop_box = (
-                    int(round(px_xmin)),
-                    int(round(px_ymin)),
-                    int(round(px_xmax)),
-                    int(round(px_ymax)),
+                    round(px_xmin),
+                    round(px_ymin),
+                    round(px_xmax),
+                    round(px_ymax),
                 )
 
                 # Ensure non-zero crop area
@@ -178,10 +174,7 @@ def crop_single_task(task_args: dict) -> Tuple[bool, str]:
                     crop = crop.convert("RGB")
 
                 dest_dir = dest_dirs[cls_id]
-                if multi_box:
-                    out_filename = f"{stem}_crop{idx}{ext}"
-                else:
-                    out_filename = f"{stem}{ext}"
+                out_filename = f"{stem}_crop{idx}{ext}" if multi_box else f"{stem}{ext}"
 
                 out_path = os.path.join(dest_dir, out_filename)
                 crop.save(out_path, format="JPEG", quality=95)
@@ -192,14 +185,14 @@ def crop_single_task(task_args: dict) -> Tuple[bool, str]:
 
 
 def split_dataset(
-    samples_per_class: Dict[int, List[dict]],
+    samples_per_class: dict[int, list[dict]],
     train_ratio: float = 0.7,
     val_ratio: float = 0.2,
     test_ratio: float = 0.1,
     min_test_per_class: int = 5,
     group_by_base: bool = True,
-    seed: int = 42,
-) -> Dict[str, List[dict]]:
+    seed: int = 4266,
+) -> dict[str, list[dict]]:
     """
     Splits samples into 'train', 'val', (and optionally 'test') splits.
     If group_by_base is True, groups samples with the same base name so that
@@ -210,11 +203,10 @@ def split_dataset(
     splits = {"train": [], "val": [], "test": []}
 
     total_ratio = train_ratio + val_ratio + test_ratio
-    train_ratio /= total_ratio
     val_ratio /= total_ratio
     test_ratio /= total_ratio
 
-    for cls_id, samples in samples_per_class.items():
+    for samples in samples_per_class.values():
         if group_by_base:
             base_groups = defaultdict(list)
             for s in samples:
@@ -225,8 +217,8 @@ def split_dataset(
             rng.shuffle(groups)
 
             total_cls_samples = len(samples)
-            target_test = max(min_test_per_class, int(round(total_cls_samples * test_ratio))) if test_ratio > 0 else 0
-            target_val = int(round(total_cls_samples * val_ratio)) if val_ratio > 0 else 0
+            target_test = max(min_test_per_class, round(total_cls_samples * test_ratio)) if test_ratio > 0 else 0
+            target_val = round(total_cls_samples * val_ratio) if val_ratio > 0 else 0
 
             val_group_samples = []
             test_group_samples = []
@@ -237,7 +229,7 @@ def split_dataset(
 
             for g in groups:
                 # Prioritize satisfying the minimum test quota first, then target test
-                if test_ratio > 0 and (cur_test < target_test or cur_test < min_test_per_class):
+                if test_ratio > 0 and cur_test < target_test:
                     test_group_samples.extend(g)
                     cur_test += len(g)
                 elif val_ratio > 0 and cur_val < target_val:
@@ -253,8 +245,8 @@ def split_dataset(
             cls_samples = list(samples)
             rng.shuffle(cls_samples)
             n = len(cls_samples)
-            n_test = max(min_test_per_class, int(round(n * test_ratio))) if test_ratio > 0 else 0
-            n_val = int(round(n * val_ratio)) if val_ratio > 0 else 0
+            n_test = max(min_test_per_class, round(n * test_ratio)) if test_ratio > 0 else 0
+            n_val = round(n * val_ratio) if val_ratio > 0 else 0
 
             n_test = min(n, n_test)
             n_val = min(n - n_test, n_val)
@@ -269,7 +261,7 @@ def split_dataset(
 def run_pipeline(
     raw_dir: str,
     output_dir: str,
-    yaml_file: Optional[str] = None,
+    yaml_file: str | None = None,
     train_ratio: float = 0.7,
     val_ratio: float = 0.2,
     test_ratio: float = 0.1,
@@ -277,10 +269,10 @@ def run_pipeline(
     no_split: bool = False,
     group_by_base: bool = True,
     padding: float = 0.0,
-    target_size: Optional[Tuple[int, int]] = None,
+    target_size: tuple[int, int] | None = None,
     replace_spaces: bool = True,
     workers: int = 8,
-    seed: int = 42,
+    seed: int = 4266,
     clean: bool = True,
 ):
     raw_path = Path(raw_dir).resolve()
@@ -294,10 +286,7 @@ def run_pipeline(
         )
 
     # Resolve data.yaml
-    if yaml_file:
-        yaml_path = Path(yaml_file).resolve()
-    else:
-        yaml_path = raw_path / "data.yaml"
+    yaml_path = Path(yaml_file).resolve() if yaml_file else raw_path / "data.yaml"
 
     class_names = load_yaml_names(str(yaml_path))
     print(f"Loaded {len(class_names)} classes from {yaml_path.name}: {class_names}")
@@ -339,7 +328,6 @@ def run_pipeline(
             "img_name": img_fname,
             "img_path": str(images_dir / img_fname),
             "boxes": boxes,
-            "primary_class": primary_cls,
         }
         samples_per_class[primary_cls].append(sample)
         total_boxes += len(boxes)
@@ -366,9 +354,9 @@ def run_pipeline(
         for cid, s_name in sanitized_names.items():
             (output_path / s_name).mkdir(parents=True, exist_ok=True)
 
-        for cls_id, samples in samples_per_class.items():
+        dest_dirs = {cid: str(output_path / sanitized_names[cid]) for cid in class_names}
+        for samples in samples_per_class.values():
             for s in samples:
-                dest_dirs = {cid: str(output_path / sanitized_names[cid]) for cid in class_names.keys()}
                 task_list.append({
                     "img_path": s["img_path"],
                     "boxes": s["boxes"],
@@ -399,8 +387,8 @@ def run_pipeline(
             for cid, s_name in sanitized_names.items():
                 (split_dir / s_name).mkdir(parents=True, exist_ok=True)
 
+            dest_dirs = {cid: str(split_dir / sanitized_names[cid]) for cid in class_names}
             for s in split_samples:
-                dest_dirs = {cid: str(split_dir / sanitized_names[cid]) for cid in class_names.keys()}
                 task_list.append({
                     "img_path": s["img_path"],
                     "boxes": s["boxes"],
@@ -422,23 +410,24 @@ def run_pipeline(
         with ProcessPoolExecutor(max_workers=workers) as executor:
             futures = [executor.submit(crop_single_task, task) for task in task_list]
             if tqdm:
-                for future in tqdm(as_completed(futures), total=len(futures), desc="Cropping dataset"):
-                    ok, msg = future.result()
-                    if ok:
-                        successful += 1
-                    else:
-                        failed += 1
-                        errors.append(msg)
+                iterator = tqdm(
+                    as_completed(futures),
+                    total=len(futures),
+                    desc="Cropping dataset",
+                )
             else:
-                for future in as_completed(futures):
-                    ok, msg = future.result()
-                    if ok:
-                        successful += 1
-                    else:
-                        failed += 1
-                        errors.append(msg)
-                    if (successful + failed) % 100 == 0 or (successful + failed) == len(futures):
-                        print(f"Processed {successful + failed}/{len(futures)} images...")
+                iterator = as_completed(futures)
+
+            for future in iterator:
+                ok, msg = future.result()
+                if ok:
+                    successful += 1
+                else:
+                    failed += 1
+                    errors.append(msg)
+                processed = successful + failed
+                if not tqdm and (processed % 100 == 0 or processed == len(futures)):
+                    print(f"Processed {processed}/{len(futures)} images...")
     else:
         # Serial fallback
         for task in task_list:
@@ -453,7 +442,7 @@ def run_pipeline(
     out_yaml = {
         "path": ".",
         "nc": len(class_names),
-        "names": {cid: sanitized_names[cid] for cid in sorted(class_names.keys())},
+        "names": {cid: sanitized_names[cid] for cid in sorted(class_names)},
     }
     if not no_split:
         out_yaml["train"] = "train"
@@ -482,8 +471,8 @@ def run_pipeline(
             print(f" ... and {len(errors) - 5} more.")
 
     print("\nClass Distribution per Split:")
-    all_classes = [sanitized_names[cid] for cid in sorted(class_names.keys())]
-    header = f"{'Class Name':<15}" + "".join([f"{s.upper():<12}" for s in split_counts.keys()]) + f"{'TOTAL':<10}"
+    all_classes = [sanitized_names[cid] for cid in sorted(class_names)]
+    header = f"{'Class Name':<15}" + "".join(f"{s.upper():<12}" for s in split_counts) + f"{'TOTAL':<10}"
     print("-" * len(header))
     print(header)
     print("-" * len(header))
@@ -492,7 +481,7 @@ def run_pipeline(
     for cname in all_classes:
         row = f"{cname:<15}"
         row_total = 0
-        for sname in split_counts.keys():
+        for sname in split_counts:
             cnt = split_counts[sname][cname]
             total_per_split[sname] += cnt
             row_total += cnt
@@ -501,7 +490,7 @@ def run_pipeline(
         print(row)
 
     print("-" * len(header))
-    totals_row = f"{'TOTAL':<15}" + "".join([f"{total_per_split[s]:<12}" for s in split_counts.keys()]) + f"{sum(total_per_split.values()):<10}"
+    totals_row = f"{'TOTAL':<15}" + "".join(f"{total_per_split[s]:<12}" for s in split_counts) + f"{sum(total_per_split.values()):<10}"
     print(totals_row)
     print("=" * 60)
     print("\nReady for YOLO classification training! Example command:")
@@ -592,8 +581,8 @@ def parse_args():
     parser.add_argument(
         "--seed",
         type=int,
-        default=42,
-        help="Random seed for dataset splitting (default: 42).",
+        default=4266,
+        help="Random seed for dataset splitting (default: 4266).",
     )
     parser.add_argument(
         "--no-clean",

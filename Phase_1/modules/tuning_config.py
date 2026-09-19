@@ -1,27 +1,44 @@
-"""Convert the tuning YAML settings into arguments for model.tune()."""
+"""Convert the tuning YAML settings into a W&B sweep dict."""
 from .wandb_config import prepare_wandb_tuning
-from ray import tune
 
 
-def build_tune_space(schema):
-    """Turn each uniform range or choice list into a Ray search parameter."""
+def build_sweep_parameters(schema):
+    """Turn each uniform range or choice list into a W&B sweep parameter."""
+    params = {}
 
-    space = {}
-
-    for name, specification in schema.items():
-        operation = specification.get("type")
-        if operation == "uniform":
-            space[name] = tune.uniform(specification["min"], specification["max"])
-        elif operation == "choice":
-            space[name] = tune.choice(specification["values"])
+    for name, spec in (schema or {}).items():
+        op = spec.get("type")
+        if op == "uniform":
+            params[name] = {
+                "distribution": "uniform",
+                "min": spec["min"],
+                "max": spec["max"],
+            }
+        elif op == "choice":
+            params[name] = {"values": spec["values"]}
         else:
-            raise ValueError(f"Unsupported Tune operation for {name}: {operation}")
+            raise ValueError(f"Unsupported sweep operation for {name}: {op}")
 
-    return space
+    return params
 
 
-def prepare_tuning_arguments(tuner_config):
-    """Set up W&B and convert the search space before tuning starts."""
-    arguments = prepare_wandb_tuning(tuner_config)
-    arguments["space"] = build_tune_space(arguments["space"])
-    return arguments
+def prepare_sweep(tuner_config):
+    """Check W&B, split sweep settings from fixed trial config."""
+    args = prepare_wandb_tuning(tuner_config)
+
+    space = args.pop("space", {})
+    method = args.pop("method", "bayes")
+    metric = args.pop("metric", {"name": "val_accuracy", "goal": "maximize"})
+    iterations = int(args.pop("iterations", 20))
+    # rest of args (data, epochs, augments, etc) are fixed for every trial
+    fixed = args
+
+    sweep = {
+        "method": method,
+        "metric": metric,
+        "parameters": build_sweep_parameters(space),
+    }
+    if fixed.get("name"):
+        sweep["name"] = fixed["name"]
+
+    return sweep, fixed, iterations

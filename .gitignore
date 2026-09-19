@@ -226,3 +226,15 @@ Phase_1/tuning/classify/
 Phase_1/tuning/detect/
 tuning/classify/
 tuning/detect/
+
+# Archived YOLO trial outputs
+Phase_1/archive/yolo/tuning/classify/
+Phase_1/archive/yolo/tuning/detect/
+
+# Model checkpoints and runs (exceeds GitHub 100MB limit)
+Phase_1/runs/
+*.keras
+
+# Weights & Biases
+Phase_1/wandb/
+wandb/

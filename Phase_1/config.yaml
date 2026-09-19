@@ -1,23 +1,44 @@
-# hyperparams for yolo26
-
+# hyperparams for tf resnet
 # training
 data: "/app/data"
-epochs: 50
+epochs: 100
+early_stopping_patience: 5
+reduce_lr_patience: 4
+reduce_lr_factor: 0.2
+min_learning_rate: 0.000005
+batch: 16
 workers: 0 # Load data in the training process to reduce RAM usage.
-imgsz: 640
+image_size: 256
 device: 0
 project: "/app/runs"
-name: "yolo26_speed_limit"
+name: "tf_resnet50_speed_limit_aug"
+
+# model, change this to try other backbones
+model_name: resnet50 # resnet50, resnet101
+pretrained: true # use imagenet weights
+freeze_backbone: false # if true, only train the last layer first
+dropout: 0.4
+
+# optimizer
+optimizer: adam # sgd, adam, adamw
+learning_rate: 0.0003
+momentum: 0.9 # only used for sgd
+weight_decay: 0.0005 # only used for adamw, and as l2 on last layer
+seed: 4266
+class_weight: balanced # balanced or none, helps when classes are uneven
 
 wandb: # dont change
   project: adversarial-cv-speed-limit-sign
   entity: hongyaok-hongyaok
 
-# augmentations
+# augmentations, same values as old yolo config
 # see https://docs.ultralytics.com/guides/yolo-data-augmentation
-hsv_h: 0.1
-hsv_s: 0.5
-hsv_v: 0.5
+# these are applied on the fly, only on train split
+# augment false = train gets resize + preprocess only, same as val
+augment: true
+hsv_h: 0.02
+hsv_s: 0.1
+hsv_v: 0.1
 degrees: 30
 translate: 0.1
 scale: 0.1
@@ -25,9 +46,10 @@ shear: 5
 perspective: 0.0005
 flipud: 0
 fliplr: 0
-bgr: 0.5
+bgr: 0
+grayscale: 0.05
 mosaic: 0
 mixup: 0
 cutmix: 0
 copy_paste: 0
-erasing: 0.25
+erasing: 0

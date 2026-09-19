@@ -3,8 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: speed-limit-classifier:phase1
-    container_name: phase1_yolo26_train
+    image: speed-limit-classifier:phase1-tf
+    container_name: phase1_tf_train
     environment:
       PYTHONUNBUFFERED: "1"
       CUDA_VISIBLE_DEVICES: "0"
@@ -16,10 +16,12 @@ services:
       - ../data/data_processed:/app/data:ro
       # Mount runtime sources and output only, excluding the local .env secret.
       - ./train.py:/app/train.py
+      - ./modules:/app/modules
       - ./config.yaml:/app/config.yaml
       - ./tuner.yaml:/app/tuner.yaml
       - ./run.sh:/app/run.sh
       - ./runs:/app/runs
+      # - ./tuning:/app/tuning
     deploy:
       resources:
         reservations:
@@ -27,7 +29,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [ gpu ]
-    # Allocate shared memory for PyTorch DataLoader workers to avoid bus errors
+    # Allocate shared memory for data loading to avoid bus errors
     shm_size: '8gb'
     ipc: host
     command: bash run.sh
