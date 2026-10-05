@@ -1,0 +1,11 @@
+ray_trial_directory: /app/tuning/detect/adversarial-cv-speed-limit-sign/yolo26_speed_limit_tune/_tune_4ad606e9
+top1_accuracy: 1.0
+lr0: 0.016472366566590207
+lrf: 0.4204794410598428
+batch: 16
+imgsz: 416
+momentum: 0.8205183116046716
+weight_decay: 0.021033972788862362
+cls: 0.7405536048248977
+optimizer: SGD
+data: /app/data
