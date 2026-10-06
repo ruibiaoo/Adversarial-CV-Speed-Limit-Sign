@@ -277,7 +277,7 @@ def save_predictions(
 
 def main():
     phase_directory = Path(__file__).resolve().parent
-    config = load_config(phase_directory / "test.yaml")
+    config = load_config(phase_directory / "configs" / "test.yaml")
 
     config["model_path"] = resolve_path(
         config["model_path"], phase_directory

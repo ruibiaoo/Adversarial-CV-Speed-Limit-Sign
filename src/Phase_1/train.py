@@ -111,14 +111,7 @@ def train_once(cfg, track):
 
     epochs = int(cfg.get("epochs", 50))
     project = cfg.get("project", "/app/runs")
-    name = cfg.get("name", "tf_resnet_speed_limit")
-    save_dir = Path(project) / name
-    # sweep trials share the same name, so give each run its own folder
-    # single training keeps project/name, sweep gets project/name/run_id
-    if track:
-        run_id = getattr(getattr(wandb, "run", None), "id", None)
-        if run_id:
-            save_dir = save_dir / str(run_id)
+    save_dir = Path(project)
     save_dir.mkdir(parents=True, exist_ok=True)
 
     reduce_lr_factor = float(cfg.get("reduce_lr_factor", 0.5))
@@ -221,8 +214,8 @@ def start_sweep_agent(sweep_id, iterations, base, output_directory):
 
 def main():
     phase_directory = Path(__file__).resolve().parent
-    config = load_config(phase_directory / "config.yaml")
-    tuner_config = load_config(phase_directory / "tuner.yaml")
+    config = load_config(phase_directory / "configs" / "train.yaml")
+    tuner_config = load_config(phase_directory / "configs" / "tuner.yaml")
     tuning = tuner_config.get("tuner", False)
 
     if tuning:

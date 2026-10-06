@@ -1,0 +1,27 @@
+# Git and local Python environment
+.git/
+.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Dataset is mounted at runtime
+data/
+
+# Generated Phase 1 files
+src/Phase_1/runs/
+src/Phase_1/results/
+src/Phase_1/wandb/
+src/Phase_1/.env
+
+# Model artifacts
+*.keras
+*.h5
+*.pt
+*.pth
+
+# Development files
+.vscode/
+.idea/
+.pytest_cache/
+.ruff_cache/
