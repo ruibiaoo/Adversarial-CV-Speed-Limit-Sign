@@ -1,8 +1,0 @@
-archive/
-runs/
-tuning/
-data/
-wandb/
-__pycache__/
-*.pyc
-*.pt
