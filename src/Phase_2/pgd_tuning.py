@@ -1,7 +1,6 @@
 from itertools import product
 from pathlib import Path
 import random
-import sys
 from time import perf_counter
 
 import matplotlib
@@ -106,24 +105,36 @@ def load_validation_batches(config: dict, repo_directory: Path):
 
 
 def load_phase_1_model(model_path: Path, repo_directory: Path, num_classes: int):
-    try:
-        return tf.keras.models.load_model(model_path, compile=False)
-    except (ModuleNotFoundError, TypeError, ValueError) as load_error:
-        if str(repo_directory) not in sys.path:
-            sys.path.insert(0, str(repo_directory))
-        from src.Phase_1.modules.model import build_model
 
-        train_config_path = repo_directory / "src" / "Phase_1" / "configs" / "train.yaml"
-        train_config = load_config(train_config_path)
-        train_config["pretrained"] = False
-        model = build_model(train_config, num_classes)
-        try:
-            model.load_weights(model_path)
-        except Exception as weight_error:
-            raise RuntimeError(
-                f"Could not load model {model_path}: {load_error}"
-            ) from weight_error
-        return model
+    model_path = Path(model_path)
+
+    if not model_path.is_absolute():
+        model_path = repo_directory / model_path
+
+    if not model_path.is_file():
+        raise FileNotFoundError(f"Model not found: {model_path}")
+
+    # Load the complete pretrained ResNet model directly
+    model = tf.keras.models.load_model(
+        str(model_path),
+        compile=False
+    )
+
+    # Freeze pretrained model weights
+    model.trainable = False
+
+    # Verify the number of output classes
+    if model.output_shape[-1] != num_classes:
+        raise ValueError(
+            f"Expected {num_classes} classes, "
+            f"but model outputs {model.output_shape[-1]}"
+        )
+
+    print("Phase 1 ResNet loaded successfully!")
+    print("Input shape:", model.input_shape)
+    print("Output shape:", model.output_shape)
+
+    return model
 
 
 def load_art_classifier(config:dict, repo_directory: Path):
