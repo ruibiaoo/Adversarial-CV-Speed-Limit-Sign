@@ -16,7 +16,9 @@ services:
       - ../../data/data_processed:/app/data:ro
       - ./:/app
       - ./train.py:/app/train.py:ro
+      - ./test.py:/app/test.py:ro
       - ./gradcam.py:/app/gradcam.py:ro
+      - ./run.sh:/app/run.sh:ro
       - ./modules:/app/modules:ro
       - ./configs:/app/configs:ro
       - ./results:/app/results

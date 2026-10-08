@@ -70,3 +70,28 @@ def get_optimizer(config):
     if name == "adamw":
         return tf.keras.optimizers.AdamW(learning_rate=lr, weight_decay=weight_decay)
     raise ValueError(f"Unknown optimizer: {name}")
+
+
+def load_classifier(model_path, image_size=256, num_classes=7):
+    """Load model, falling back to architecture reconstruction for Keras 2/3 cross-compatibility."""
+    try:
+        return tf.keras.models.load_model(model_path, compile=False)
+    except Exception:
+        pass
+
+    import tempfile
+    import zipfile
+
+    model = build_model(
+        {"model_name": "resnet50", "image_size": image_size, "pretrained": False},
+        num_classes=num_classes,
+    )
+    if zipfile.is_zipfile(model_path):
+        with zipfile.ZipFile(model_path, "r") as z:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                extracted_path = z.extract("model.weights.h5", tmp_dir)
+                model.load_weights(extracted_path)
+    else:
+        model.load_weights(model_path)
+    return model
+

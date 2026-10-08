@@ -275,6 +275,40 @@ def save_predictions(
             writer.writerow(row)
 
 
+def load_classifier(model_path, image_size=256, num_classes=7):
+    """Load model, falling back to architecture reconstruction for Keras 2/3 cross-compatibility."""
+    try:
+        return tf.keras.models.load_model(model_path, compile=False)
+    except Exception:
+        pass
+
+    import tempfile
+    import zipfile
+
+    if __package__:
+        from .modules.model import build_model
+    else:
+        try:
+            from modules.model import build_model
+        except ModuleNotFoundError:
+            import sys
+            sys.path.append(str(Path(__file__).resolve().parent))
+            from modules.model import build_model
+
+    model = build_model(
+        {"model_name": "resnet50", "image_size": image_size, "pretrained": False},
+        num_classes=num_classes,
+    )
+    if zipfile.is_zipfile(model_path):
+        with zipfile.ZipFile(model_path, "r") as z:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                extracted_path = z.extract("model.weights.h5", tmp_dir)
+                model.load_weights(extracted_path)
+    else:
+        model.load_weights(model_path)
+    return model
+
+
 def main():
     phase_directory = Path(__file__).resolve().parent
     config = load_config(phase_directory / "configs" / "test.yaml")
@@ -290,8 +324,9 @@ def main():
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}")
 
-    model = tf.keras.models.load_model(model_path)
     image_size = int(config["image_size"])
+    num_classes = len(config["class_names"])
+    model = load_classifier(model_path, image_size=image_size, num_classes=num_classes)
     input_height = model.input_shape[1]
     input_width = model.input_shape[2]
     if input_height != image_size or input_width != image_size:
