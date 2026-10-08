@@ -156,7 +156,7 @@ def main() -> None:
     seed = int(config["experiment"]["seed"])
     random.seed(seed)
     np.random.seed(seed)
-    tf.keras.utils.set_random_seed(seed)
+    tf.random.set_seed(random.seed)
     classifier = load_art_classifier(config, repo_directory)
     attack = pgd_attack(classifier, config, parameters)
     image_size = int(config["model"]["image_size"])

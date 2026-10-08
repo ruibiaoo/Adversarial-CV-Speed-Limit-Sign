@@ -402,7 +402,7 @@ def main():
     seed = int(pgd_config["experiment"]["seed"])
     random.seed(seed)
     np.random.seed(seed)
-    tf.keras.utils.set_random_seed(seed)
+    tf.random.set_seed(seed)
 
     output_directory = resolve_repo_path(
         pgd_config["experiment"]["output_dir"], repo_directory
