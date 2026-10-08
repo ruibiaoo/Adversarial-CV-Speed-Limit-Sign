@@ -15,4 +15,4 @@ class_names:
   - 70_MPH
 
 # Test reports are saved here
-output_dir: "/app/results/test"
+output_dir: "/app/results/test2"
