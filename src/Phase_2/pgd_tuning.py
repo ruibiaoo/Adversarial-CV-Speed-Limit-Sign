@@ -431,8 +431,10 @@ def main():
         )
         results.append(result)
         print(
-            f"ASR={result['attack_success_rate']:.4f}, "
-            f"adversarial accuracy={result['adversarial_accuracy']:.4f}"
+            f"Clean Accuracy={result['clean_accuracy']:.4%}, "
+            f"ASR={result['attack_success_rate']:.4%}, "
+            f"Robust Accuracy={result['adversarial_accuracy']:.4%}, "
+            f"Mean CE={result['mean_adversarial_loss']:.4f}"
         )
 
     if len(results) != 36:
