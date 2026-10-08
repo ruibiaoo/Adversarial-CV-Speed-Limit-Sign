@@ -17,6 +17,8 @@ dependencies = [
     "seaborn>=0.13.0",
     "tensorflow==2.16.2; sys_platform != 'win32'",
     "tensorflow-intel==2.16.2; sys_platform == 'win32'",
+    "tensorflow[and-cuda]==2.16.2",
+    "tf-keras==2.16.0",
     "tqdm>=4.66.0",
     "wandb==0.19.11",
 ]
