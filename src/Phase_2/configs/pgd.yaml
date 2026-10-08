@@ -1,0 +1,39 @@
+experiment:
+  seed: 42
+  split: val
+  output_dir: src/Phase_2/results
+
+model:
+  path: src/Phase_1/runs/best.keras
+  image_size: 256
+  from_logits: false
+
+data:
+  root: data/data_processed
+  batch_size: 32
+  class_names:
+    - 10_MPH
+    - 20_MPH
+    - 30_MPH
+    - 40_MPH
+    - 50_MPH
+    - 60_MPH
+    - 70_MPH
+
+attack:
+  name: pgd
+  objective: untargeted
+  norm: linf
+  random_start: true
+  loss: cross_entropy
+  clip_min: 0.0
+  clip_max: 1.0
+  label_source: ground_truth
+  selection: highest_loss_per_image
+
+sweep:
+  iterations: [5, 10, 20, 40]
+  epsilon_255: [8]
+  alpha_ratio: [0.125, 0.25, 0.5]
+  restarts: [1, 3, 5]
+
