@@ -43,7 +43,7 @@ def build_test_dataset(config):
     image_size = int(config["image_size"])
     batch = int(config["batch"])
     class_names = list(config["class_names"])
-    test_dir = Path(config["data"]) / "test"
+    test_dir = Path(config["data"]) / config["split"]
 
     dataset = tf.keras.utils.image_dataset_from_directory(
         test_dir,

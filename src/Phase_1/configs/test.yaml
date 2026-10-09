@@ -1,6 +1,7 @@
 # Model and test data
 model_path: "/app/runs/best.keras"
 data: "/app/data"
+split: "val"
 image_size: 256 # must be same as model thats was trained
 batch: 16
 
@@ -15,4 +16,4 @@ class_names:
   - 70_MPH
 
 # Test reports are saved here
-output_dir: "/app/results/test2"
+output_dir: "/app/results/val1"

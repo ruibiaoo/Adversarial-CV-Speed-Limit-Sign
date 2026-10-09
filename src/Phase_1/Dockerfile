@@ -1,7 +1,7 @@
 # Base image: TF runtime (CPU)
-FROM tensorflow/tensorflow:2.16.2
+# FROM tensorflow/tensorflow:2.16.2
 # GPU base image (for CUDA/GPU systems):
-# FROM tensorflow/tensorflow:2.16.2-gpu
+FROM tensorflow/tensorflow:2.16.2-gpu
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -9,8 +9,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     OMP_NUM_THREADS=4
 # For GPU:
-#   NVIDIA_VISIBLE_DEVICES=all \
-#   NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Set working directory inside container
 WORKDIR /app
