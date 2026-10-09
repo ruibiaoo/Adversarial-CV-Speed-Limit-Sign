@@ -113,20 +113,26 @@ def eligible_test_images(csv_path: Path, test_root: Path, class_names: list[str]
     return selected
 
 
+def decode_model_input(image_bytes: bytes | tf.Tensor, image_size: int) -> np.ndarray:
+    """Decode bytes exactly as test images are decoded for Phase 2 inference."""
+    image = tf.io.decode_image(image_bytes, channels=3, expand_animations=False)
+    image = tf.image.resize(image, (image_size, image_size), method="bilinear")
+    return np.asarray(image, dtype=np.float32) / 255.0
+
+
 def load_rgb_image(path: Path, image_size: int) -> np.ndarray:
     try:
-        data = tf.io.read_file(str(path))
-        image = tf.io.decode_image(data, channels=3, expand_animations=False)
-        image = tf.image.resize(image, (image_size, image_size), method="bilinear")
-        return np.asarray(image, dtype=np.float32) / 255.0
+        return decode_model_input(tf.io.read_file(str(path)), image_size)
     except (tf.errors.OpError, ValueError) as error:
         raise ValueError(f"Could not decode test image {path}: {error}") from error
 
 
 def encode_bounded_jpg(
-    path: Path, original: np.ndarray, attacked: np.ndarray, epsilon: float
+    path: Path, original: np.ndarray, attacked: np.ndarray, epsilon: float,
+    image_size: int,
 ) -> tuple[bytes, float, float]:
-    # Leave progressively more room for JPEG compression without changing PGD settings.
+    # A JPEG can change pixels after PGD. Check the encoded bytes using the
+    # same TensorFlow decoder and resize operation used for model inference.
     lower = np.ceil(np.maximum(0.0, original - epsilon) * 255.0)
     upper = np.floor(np.minimum(1.0, original + epsilon) * 255.0)
     for scale in (1.0, 0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125):
@@ -137,14 +143,14 @@ def encode_bounded_jpg(
             buffer, format="JPEG", quality=100, subsampling=0
         )
         jpeg_bytes = buffer.getvalue()
-        with Image.open(BytesIO(jpeg_bytes)) as decoded_image:
-            decoded = np.asarray(decoded_image.convert("RGB"), dtype=np.float32) / 255.0
-        observed_maximum = float(np.max(np.abs(decoded - original)))
-        if observed_maximum <= epsilon + 1e-6:
+        decoded = decode_model_input(jpeg_bytes, image_size)
+        observed_maximum = float(np.max(np.abs(decoded.astype(np.float64) - original)))
+        if observed_maximum <= epsilon:
             return jpeg_bytes, scale, observed_maximum
     raise RuntimeError(
-        f"No JPEG encoding stayed within epsilon for {path}. "
-        "Use a lossless format to preserve the PGD constraint."
+        f"No JPEG encoding stayed within epsilon={epsilon:.8f} when decoded "
+        f"for model inference: {path}. No attacked images were saved. "
+        "JPEG is lossy; use PNG if this budget cannot be met with JPEG."
     )
 
 
@@ -198,7 +204,7 @@ def main() -> None:
                 raise RuntimeError(f"Invalid PGD output for {source}: L∞={maximum_change}")
             destination = output_root / name / filename
             image_bytes, scale, saved_linf = encode_bounded_jpg(
-                destination, clean, adversarial, epsilon
+                destination, clean, adversarial, epsilon, image_size
             )
             encoded_images.append((destination, image_bytes))
             jpeg_scales.append(scale)
@@ -211,7 +217,7 @@ def main() -> None:
         destination.write_bytes(image_bytes)
     print(f"Saved {len(selected)} attacked test images to {output_root}")
     print(
-        f"Decoded JPEG L-inf maximum: {maximum_saved_linf:.8f} "
+        f"TensorFlow-decoded JPEG L-inf maximum: {maximum_saved_linf:.8f} "
         f"(epsilon={epsilon:.8f}); images contracted for JPEG: "
         f"{sum(scale < 1.0 for scale in jpeg_scales)}"
     )
