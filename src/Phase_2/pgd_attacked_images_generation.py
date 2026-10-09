@@ -137,15 +137,30 @@ def encode_bounded_png(
     if np.any(lower > upper):
         raise RuntimeError(f"No uint8 pixel value is within epsilon for {path}")
     pixels = np.clip(np.rint(attacked * 255.0), lower, upper).astype(np.uint8)
-    png_bytes = tf.io.encode_png(tf.convert_to_tensor(pixels)).numpy()
-    decoded = decode_model_input(png_bytes, image_size)
-    observed_maximum = float(np.max(np.abs(decoded.astype(np.float64) - original_64)))
-    if observed_maximum > epsilon:
-        raise RuntimeError(
-            f"Saved PNG would exceed epsilon={epsilon:.8f} for {path}: "
-            f"L-inf={observed_maximum:.8f}. No attacked images were saved."
-        )
-    return png_bytes, observed_maximum
+    for _ in range(3):
+        png_bytes = tf.io.encode_png(tf.convert_to_tensor(pixels)).numpy()
+        decoded = decode_model_input(png_bytes, image_size)
+        difference = decoded.astype(np.float64) - original_64
+        observed_maximum = float(np.max(np.abs(difference)))
+        if observed_maximum <= epsilon:
+            return png_bytes, observed_maximum
+
+        # Float32 normalization can put a boundary pixel a few nanounits
+        # beyond epsilon. Move only the offending channels one uint8 level
+        # toward the clean image, then check the encoded PNG again.
+        too_high = difference > epsilon
+        too_low = difference < -epsilon
+        corrected = pixels.astype(np.int16)
+        corrected[too_high] -= 1
+        corrected[too_low] += 1
+        if np.any((corrected < 0) | (corrected > 255)):
+            break
+        pixels = corrected.astype(np.uint8)
+
+    raise RuntimeError(
+        f"Saved PNG would exceed epsilon={epsilon:.8f} for {path}: "
+        f"L-inf={observed_maximum:.8f}. No attacked images were saved."
+    )
 
 
 def main() -> None:
