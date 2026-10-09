@@ -233,8 +233,10 @@ Phase_1/archive/yolo/tuning/detect/
 
 # Model checkpoints and runs (exceeds GitHub 100MB limit)
 Phase_1/runs/
+Phase_3/runs/
 *.keras
 
 # Weights & Biases
 Phase_1/wandb/
-wandb/
+wandb/
+Phase_3/.cuda_cache/

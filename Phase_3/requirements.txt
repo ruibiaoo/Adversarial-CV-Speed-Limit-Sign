@@ -1,0 +1,2 @@
+-r ../Phase_1/requirements.txt
+scikit-image>=0.21.0
