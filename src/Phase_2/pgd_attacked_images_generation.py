@@ -1,11 +1,11 @@
 import csv
+from io import BytesIO
 from pathlib import Path
 import random
 
 import numpy as np
 from PIL import Image
 import tensorflow as tf
-import yaml
 
 from pgd_tuning import (
     generate_best_restart,
@@ -30,7 +30,7 @@ def parse_correct(value) -> bool:
     raise ValueError(f"Invalid value in predictions.csv correct column: {value!r}")
 
 
-def validate_mapping(config: dict, source_root: Path) -> dict:
+def validate_mapping(config: dict, source_root: Path) -> None:
     names = config["data"]["class_names"]
     expected = [f"{speed}_MPH" for speed in range(10, 71, 10)]
     if names != expected:
@@ -47,7 +47,6 @@ def validate_mapping(config: dict, source_root: Path) -> dict:
     for name in names:
         if not (source_root / "test" / name).is_dir():
             raise FileNotFoundError(f"Test class directory missing: {source_root / 'test' / name}")
-    return metadata
 
 
 def selected_parameters(selected_path: Path, sweep_config: dict) -> dict:
@@ -104,7 +103,7 @@ def eligible_test_images(csv_path: Path, test_root: Path, class_names: list[str]
             image_path = test_root / name / parts[-1]
             if not image_path.is_file() or image_path.stat().st_size == 0:
                 raise FileNotFoundError(f"Row {row_number}: missing or empty test image: {image_path}")
-            output_key = (name, image_path.stem + ".png")
+            output_key = (name, image_path.stem + ".jpg")
             if output_key in seen:
                 raise ValueError(f"Row {row_number}: duplicate output filename {output_key}")
             seen.add(output_key)
@@ -124,14 +123,29 @@ def load_rgb_image(path: Path, image_size: int) -> np.ndarray:
         raise ValueError(f"Could not decode test image {path}: {error}") from error
 
 
-def save_bounded_png(path: Path, original: np.ndarray, attacked: np.ndarray, epsilon: float) -> None:
-    # Quantization must not put the saved 8-bit image outside the epsilon ball.
+def encode_bounded_jpg(
+    path: Path, original: np.ndarray, attacked: np.ndarray, epsilon: float
+) -> tuple[bytes, float, float]:
+    # Leave progressively more room for JPEG compression without changing PGD settings.
     lower = np.ceil(np.maximum(0.0, original - epsilon) * 255.0)
     upper = np.floor(np.minimum(1.0, original + epsilon) * 255.0)
-    pixels = np.clip(np.rint(attacked * 255.0), lower, upper).astype(np.uint8)
-    if np.max(np.abs(pixels.astype(np.float32) / 255.0 - original)) > epsilon + 1e-6:
-        raise RuntimeError(f"PNG quantization exceeded epsilon for {path}")
-    Image.fromarray(pixels, mode="RGB").save(path, format="PNG")
+    for scale in (1.0, 0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125):
+        candidate = original + scale * (attacked - original)
+        pixels = np.clip(np.rint(candidate * 255.0), lower, upper).astype(np.uint8)
+        buffer = BytesIO()
+        Image.fromarray(pixels, mode="RGB").save(
+            buffer, format="JPEG", quality=100, subsampling=0
+        )
+        jpeg_bytes = buffer.getvalue()
+        with Image.open(BytesIO(jpeg_bytes)) as decoded_image:
+            decoded = np.asarray(decoded_image.convert("RGB"), dtype=np.float32) / 255.0
+        observed_maximum = float(np.max(np.abs(decoded - original)))
+        if observed_maximum <= epsilon + 1e-6:
+            return jpeg_bytes, scale, observed_maximum
+    raise RuntimeError(
+        f"No JPEG encoding stayed within epsilon for {path}. "
+        "Use a lossless format to preserve the PGD constraint."
+    )
 
 
 def main() -> None:
@@ -141,17 +155,16 @@ def main() -> None:
     validate_attack_settings(config)
     parameters = selected_parameters(phase_directory / "configs" / "pgd_selected.yaml", config)
     source_root = resolve_repo_path(config["data"]["root"], repo_directory)
-    metadata = validate_mapping(config, source_root)
+    validate_mapping(config, source_root)
     csv_path = predictions_file(repo_directory)
     class_names = config["data"]["class_names"]
     selected = eligible_test_images(csv_path, source_root / "test", class_names)
-    output_root = repo_directory / "data" / "data_pgd_attacked"
-    output_test = output_root / "test"
-    if output_test.is_dir() and any(path.is_file() for path in output_test.rglob("*")):
-        raise FileExistsError(f"Attacked test directory already contains files: {output_test}")
+    output_root = repo_directory / "data" / "data_processed" / "pgd_attacked"
+    if output_root.is_dir() and any(path.is_file() for path in output_root.rglob("*")):
+        raise FileExistsError(f"Attacked image directory already contains files: {output_root}")
     for _, _, (name, filename) in selected:
-        if (output_root / "test" / name / filename).exists():
-            raise FileExistsError(f"Output image already exists: {output_root / 'test' / name / filename}")
+        if (output_root / name / filename).exists():
+            raise FileExistsError(f"Output image already exists: {output_root / name / filename}")
 
     seed = int(config["experiment"]["seed"])
     random.seed(seed)
@@ -171,8 +184,9 @@ def main() -> None:
         if not np.array_equal(np.argmax(classifier.predict(images), axis=1), labels):
             raise ValueError("predictions.csv disagrees with the current checkpoint on a selected test image")
 
-    for name in class_names:
-        (output_root / "test" / name).mkdir(parents=True, exist_ok=True)
+    encoded_images = []
+    jpeg_scales = []
+    maximum_saved_linf = 0.0
     for start in range(0, len(selected), batch_size):
         batch = selected[start:start + batch_size]
         images = np.stack([load_rgb_image(path, image_size) for path, _, _ in batch])
@@ -182,19 +196,25 @@ def main() -> None:
             maximum_change = float(np.max(np.abs(adversarial - clean)))
             if maximum_change > epsilon + 1e-5 or not np.isfinite(adversarial).all():
                 raise RuntimeError(f"Invalid PGD output for {source}: L∞={maximum_change}")
-            save_bounded_png(output_root / "test" / name / filename, clean, adversarial, epsilon)
-        print(f"Saved {min(start + batch_size, len(selected))}/{len(selected)} attacked test images")
+            destination = output_root / name / filename
+            image_bytes, scale, saved_linf = encode_bounded_jpg(
+                destination, clean, adversarial, epsilon
+            )
+            encoded_images.append((destination, image_bytes))
+            jpeg_scales.append(scale)
+            maximum_saved_linf = max(maximum_saved_linf, saved_linf)
+        print(f"Prepared {min(start + batch_size, len(selected))}/{len(selected)} attacked test images")
 
-    attacked_metadata = dict(metadata)
-    attacked_metadata.update({
-        "path": ".",
-        "train": "../data_processed/train",
-        "val": "../data_processed/val",
-        "test": "test",
-    })
-    with (output_root / "data.yaml").open("w", encoding="utf-8") as file:
-        yaml.safe_dump(attacked_metadata, file, sort_keys=False)
-    print(f"Saved {len(selected)} attacked test images and {output_root / 'data.yaml'}")
+    for name in class_names:
+        (output_root / name).mkdir(parents=True, exist_ok=True)
+    for destination, image_bytes in encoded_images:
+        destination.write_bytes(image_bytes)
+    print(f"Saved {len(selected)} attacked test images to {output_root}")
+    print(
+        f"Decoded JPEG L-inf maximum: {maximum_saved_linf:.8f} "
+        f"(epsilon={epsilon:.8f}); images contracted for JPEG: "
+        f"{sum(scale < 1.0 for scale in jpeg_scales)}"
+    )
 
 
 if __name__ == "__main__":
