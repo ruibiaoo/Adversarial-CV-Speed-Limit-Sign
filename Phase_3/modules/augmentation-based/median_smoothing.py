@@ -20,7 +20,7 @@ whose clean-val accuracy is within TOLERANCE of no defence. The tolerance is
 fixed here, before any results are seen.
 
   python modules/augmentation-based/median_smoothing.py                 # Phase 1 model
-  python modules/augmentation-based/median_smoothing.py --model runs/none/best.keras
+  python modules/augmentation-based/median_smoothing.py --model path/to/best.keras
 """
 import argparse
 from pathlib import Path

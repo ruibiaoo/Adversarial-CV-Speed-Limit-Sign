@@ -5,7 +5,6 @@ training scripts) and writes, in the same folder:
   loss_report.md          per-run tables (best epoch, train / val loss, val acc / F1)
   summary.csv             the same, one row per run
   <defence>_loss.png      train loss and val loss per epoch, one line per setting,
-                          with the no-defence baseline as a grey reference
 
   python modules/augmentation-based/report.py
 """
@@ -26,9 +25,8 @@ DEFENCES = {  # folder -> (title, grid parameter)
     "mixup": ("Mixup", "alpha"),
     "trades": ("TRADES", "beta"),
 }
-# categorical slots 1-3 (validated all-pairs, light surface), baseline in muted ink
+# categorical slots 1-3 (validated all-pairs, light surface)
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a"]
-BASELINE = "#8a8984"
 INK, INK_2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e6e5e1", "#fcfcfb"
 TRAIN_LOSS_NOTE = {
     "random_erasing": "class-weighted CE on erased images",
@@ -58,14 +56,11 @@ def style(ax, title, ylabel):
     ax.set_yscale("log")  # early epochs are 10-100x the late ones
 
 
-def plot(defence, title, runs, baseline, chosen_setting, out):
+def plot(defence, title, runs, chosen_setting, out):
     fig, axes = plt.subplots(1, 2, figsize=(11, 4), facecolor=SURFACE)
     for ax, key, sub in ((axes[0], "train_loss", f"Train loss ({TRAIN_LOSS_NOTE[defence]})"),
                          (axes[1], "val_loss", "Val loss (clean val, unweighted CE)")):
         style(ax, sub, "loss (log scale)")
-        if baseline:
-            ax.plot([r["epoch"] for r in baseline], [r[key] for r in baseline], color=BASELINE,
-                    linewidth=1.5, linestyle="--", label="no defence")
         for colour, (setting, hist, best) in zip(SERIES, runs):
             label = setting + (" (chosen)" if setting == chosen_setting else "")
             xs, ys = [r["epoch"] for r in hist], [r[key] for r in hist]
@@ -102,11 +97,6 @@ def main():
     configs = yaml.safe_load((T.PHASE3 / "defence_configs.yaml").read_text(encoding="utf-8")) or {}
     rows = []
 
-    base_csv = out / "baseline_none" / "history.csv"
-    baseline = read(base_csv) if base_csv.exists() else []
-    if baseline:
-        rows.append(row_for("none (baseline)", "-", baseline, best_epoch(baseline), False))
-
     for defence, (title, param) in DEFENCES.items():
         grid_csv = out / defence / "grid.csv"
         if not grid_csv.exists():
@@ -121,7 +111,7 @@ def main():
                 rows.append(row_for(defence, setting, hist, best_epoch(hist),
                                     chosen is not None and float(g[param]) == float(chosen)))
         chosen_setting = f"{param}={chosen}" if chosen is not None else None
-        plot(defence, title, runs, baseline, chosen_setting, out / f"{defence}_loss.png")
+        plot(defence, title, runs, chosen_setting, out / f"{defence}_loss.png")
 
     T.write_csv(out / "summary.csv", rows)
     write_markdown(out / "loss_report.md", rows, configs)
@@ -148,7 +138,7 @@ def write_markdown(path, rows, configs):
     groups = {}
     for r in rows:
         groups.setdefault(r["defence"], []).append(r)
-    titles = {"none (baseline)": "No defence (baseline)", **{k: v[0] for k, v in DEFENCES.items()}}
+    titles = {k: v[0] for k, v in DEFENCES.items()}
     for defence, items in groups.items():
         lines += [f"## {titles.get(defence, defence)}", ""]
         if defence in DEFENCES:

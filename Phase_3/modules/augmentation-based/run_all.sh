@@ -7,18 +7,19 @@ set -euo pipefail  # finished runs are reused, so re-running resumes after a cra
 mkdir -p runs/logs
 D=modules/augmentation-based
 
-# No-defence baseline: the reference curve in the loss report.
-python $D/baseline.py 2>&1 | tee runs/logs/none.log
-
-# Median smoothing is calibrated on a frozen model: the Phase 1 checkpoint if
-# present, otherwise the baseline above (same recipe).
-P1=$(python -c "from modules.common import load_config; print(load_config()['phase1_model'])")
-MODEL=runs/none/best.keras
-if [ -f "$P1" ]; then MODEL="$P1"; else echo "Phase 1 checkpoint not found ($P1), using $MODEL"; fi
-[ -f runs/median_smoothing_grid.csv ] || python $D/median_smoothing.py --model "$MODEL" 2>&1 | tee runs/logs/median_smoothing.log
-
 python $D/random_erasing.py 2>&1 | tee runs/logs/random_erasing.log
 python $D/mixup.py          2>&1 | tee runs/logs/mixup.log
 python $D/trades.py         2>&1 | tee runs/logs/trades.log
+
+# Median smoothing trains nothing: it is calibrated on the frozen Phase 1 checkpoint.
+# Run last, and skipped (with a warning) if the checkpoint is not on this machine.
+P1=$(python -c "from modules.common import load_config; print(load_config()['phase1_model'])")
+if [ -f "$P1" ]; then
+  [ -f runs/median_smoothing_grid.csv ] || python $D/median_smoothing.py --model "$P1" 2>&1 | tee runs/logs/median_smoothing.log
+else
+  echo "WARNING: Phase 1 checkpoint not found ($P1), skipping median smoothing."
+  echo "Copy it there, then run: python $D/median_smoothing.py"
+fi
+
 python $D/report.py         2>&1 | tee runs/logs/report.log
 echo "ALL DONE"

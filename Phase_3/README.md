@@ -103,15 +103,14 @@ The attacks to defend against are PGD (white-box, L∞ ε = 8/255) and Pixle (bl
 
 ### Results on clean val
 
-| Defence | Chosen setting | Val accuracy | Val macro F1 |
-|---|---|---|---|
-| No defence (baseline, Phase 1 recipe) | - | 0.9844 | 0.9810 |
-| Median smoothing | k = 7 | 0.9805 | 0.9749 |
-| Random erasing | max area = 0.3 | 0.9961 | 0.9980 |
-| Mixup | α = 0.2 | 0.9961 | 0.9980 |
-| TRADES | β = 1 | 0.9922 | 0.9931 |
+| Defence | Chosen setting | Val accuracy | Val macro F1 | Val loss |
+|---|---|---|---|---|
+| Median smoothing | not calibrated yet (needs the Phase 1 checkpoint) | - | - | - |
+| Random erasing | max area = 0.1 | 0.9961 | 0.9980 | 0.021 |
+| Mixup | α = 0.1 | 1.0000 | 1.0000 | 0.030 |
+| TRADES | β = 1 | 0.9883 | 0.9854 | 0.068 |
 
-These are clean-val numbers, used only to choose parameters. The defences are compared on the WB/BB test sets later (PRD §4, §6). Choosing β on clean val will always favour the smaller β, so evaluate both TRADES checkpoints (β = 1 and β = 6) on the attacked sets. Median smoothing was calibrated on the retrained baseline (`runs/none/best.keras`), because the Phase 1 checkpoint was not available.
+These are clean-val numbers, used only to choose parameters. The defences are compared on the WB/BB test sets later (PRD §4, §6). Choosing β on clean val will always favour the smaller β, so evaluate both TRADES checkpoints (β = 1 and β = 6) on the attacked sets. The settings within each defence are close (e.g. random erasing max area 0.3 scored 0.991, Mixup α = 0.4 scored 0.996), and the val curves swing a lot from epoch to epoch, so these picks are near ties and change between reruns. Median smoothing is calibrated on the Phase 1 checkpoint, so it needs that file on the machine you run on.
 
 ### Training and validation loss (`tuning/augmentation-tuning/`)
 
@@ -122,9 +121,8 @@ tuning/augmentation-tuning/
   loss_report.md              # start here: loss curves + per-run table for each defence
   summary.csv                 # one row per run: best epoch, train / val loss, val acc / macro F1, chosen
   random_erasing_loss.png     # train loss and val loss per epoch, one line per setting,
-  mixup_loss.png              #   no-defence baseline as a grey dashed reference,
-  trades_loss.png             #   dot = checkpoint kept
-  baseline_none/history.csv   # no-defence baseline
+  mixup_loss.png              #   (dot = checkpoint kept)
+  trades_loss.png
   median_smoothing/grid.csv   # val loss / acc / macro F1 per kernel (no training, so no epochs)
   random_erasing/             # grid.csv + max_area<v>_history.csv
   mixup/                      # grid.csv + alpha<v>_history.csv
@@ -151,6 +149,6 @@ docker compose run --rm phase3 bash modules/augmentation-based/run_all.sh   # al
 docker compose run --rm phase3 python modules/augmentation-based/mixup.py --alpha 0.2 --epochs 2   # one quick run
 ```
 
-`run_all.sh` calibrates median smoothing on the Phase 1 checkpoint. It first trains the no-defence baseline (`baseline.py`, the Phase 1 recipe with no defence) as the reference curve. If the Phase 1 checkpoint is missing, median smoothing is calibrated on that baseline. Checkpoints go to `runs/<defence>_<param><value>/best.keras`, per-epoch logs to `history.csv`, and grid results to `runs/<defence>_grid.csv`.
+`run_all.sh` trains the three training defences, then calibrates median smoothing on the Phase 1 checkpoint (skipped with a warning if that file is missing; run `median_smoothing.py --model <path>` later), then writes the report. Checkpoints go to `runs/<defence>_<param><value>/best.keras`, per-epoch logs to `history.csv`, and grid results to `runs/<defence>_grid.csv`.
 
 The first run on an RTX 50-series GPU spends about 30 min JIT-compiling kernels, because TF 2.15 has no native kernels for these GPUs. `docker-compose.yml` keeps the cache in `.cuda_cache/` so later runs skip this.

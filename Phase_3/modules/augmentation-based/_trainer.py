@@ -110,23 +110,6 @@ def class_weight_vector(config, num_classes):
     return tf.constant([cw.get(i, 1.0) for i in range(num_classes)], tf.float32)
 
 
-def plain_step(model, optimizer, class_weight, num_classes):
-    """No defence: the Phase 1 loss (class-weighted cross entropy). Used for the baseline."""
-    loss_fn = tf.keras.losses.CategoricalCrossentropy()
-
-    @tf.function
-    def train_step(x, y):
-        with tf.GradientTape() as tape:
-            probs = model(preprocess_input(x), training=True)
-            loss = loss_fn(tf.one_hot(y, num_classes), probs, sample_weight=tf.gather(class_weight, y))
-            loss += tf.add_n(model.losses) if model.losses else 0.0
-        grads = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(grads, model.trainable_variables))
-        return loss
-
-    return train_step
-
-
 def train_one(name, make_step, config, tuning_csv=None):
     """Train one model. make_step(model, optimizer, class_weight, num_classes) -> tf.function(x, y) -> loss.
 
