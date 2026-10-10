@@ -1,0 +1,4 @@
+iterations: 20
+epsilon_255: 8
+alpha_ratio: 0.25
+restarts: 1
