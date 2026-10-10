@@ -32,6 +32,25 @@ def build_augmenter(config, image_size=224):
     bgr = float(config.get("bgr", 0) or 0)
     grayscale = float(config.get("grayscale", 0) or 0)
     erasing = float(config.get("erasing", 0) or 0)
+    blur_p = float(
+        config.get("blur_p", config.get("blur_prob", config.get("blur", 0))) or 0
+    )
+    blur_raw = config.get("blur_limit", config.get("blur_strength", 7))
+    if blur_raw is None:
+        blur_k = (3, 7)
+    elif isinstance(blur_raw, (list, tuple)):
+        low = max(3, int(blur_raw[0]))
+        if low % 2 == 0:
+            low += 1
+        high = max(low, int(blur_raw[1]))
+        if high % 2 == 0:
+            high += 1
+        blur_k = (low, high)
+    else:
+        k = max(3, int(blur_raw))
+        if k % 2 == 0:
+            k += 1
+        blur_k = (3, k)
 
     transforms = []
 
@@ -45,6 +64,10 @@ def build_augmenter(config, image_size=224):
                 p=1.0,
             )
         )
+
+    # blur with configurable strength (kernel limit) and probability
+    if blur_p > 0:
+        transforms.append(A.GaussianBlur(blur_limit=blur_k, p=blur_p))
 
     # rotation + shift + scale + shear in one affine
     if degrees > 0 or translate > 0 or scale > 0 or shear > 0:

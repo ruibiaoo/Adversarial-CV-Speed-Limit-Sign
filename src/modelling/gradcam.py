@@ -78,14 +78,20 @@ def build_grad_model(model):
     if backbone is None:
         raise ValueError("Expected a nested ResNet backbone in the model.")
 
+    backbone_output = backbone.output
+    if isinstance(backbone_output, (list, tuple)) and len(backbone_output) == 1:
+        backbone_output = backbone_output[0]
+
     backbone_model = tf.keras.Model(
         backbone.input,
-        [backbone.get_layer(LAST_CONV_LAYER).output, backbone.output],
+        [backbone.get_layer(LAST_CONV_LAYER).output, backbone_output],
     )
     head_layers = model.layers[model.layers.index(backbone) + 1:]
 
     def forward(batch):
         conv_maps, x = backbone_model(batch, training=False)
+        if isinstance(x, (list, tuple)) and len(x) == 1:
+            x = x[0]
         for layer in head_layers:
             x = layer(x, training=False)
         return conv_maps, x
@@ -97,6 +103,8 @@ def make_heatmap(forward, batch, class_index=None):
     """Compute Grad-CAM heatmap (H x W in [0, 1]) for one preprocessed image."""
     with tf.GradientTape() as tape:
         conv_maps, predictions = forward(batch)
+        if len(predictions.shape) == 3 and predictions.shape[1] == 1:
+            predictions = tf.squeeze(predictions, axis=1)
         if class_index is None:
             class_index = int(tf.argmax(predictions[0]))
         score = predictions[:, class_index]

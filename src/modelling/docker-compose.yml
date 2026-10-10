@@ -2,7 +2,7 @@ services:
   phase1-classifier:
     build:
       context: ../..
-      dockerfile: src/Phase_1/Dockerfile
+      dockerfile: src/modelling/Dockerfile
     image: speed-limit-classifier:phase1-tf
     container_name: phase1_tf_train
     environment:
@@ -13,7 +13,7 @@ services:
       WANDB_ENTITY: hongyaok-hongyaok
     volumes:
       # Mount dataset directory from repo root as read-only
-      - ../../data/data_processed:/app/data:ro
+      - ../../data/data_updated:/app/data:ro
       - ./:/app
       - ./train.py:/app/train.py:ro
       - ./test.py:/app/test.py:ro

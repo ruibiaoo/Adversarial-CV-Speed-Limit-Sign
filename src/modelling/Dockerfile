@@ -17,13 +17,13 @@ WORKDIR /app
 
 # Install Python packages into the base image's system Python (TF already present)
 COPY --from=ghcr.io/astral-sh/uv:0.11.31 /uv /uvx /bin/
-COPY src/Phase_1/requirements.txt ./requirements.txt
+COPY src/modelling/requirements.txt ./requirements.txt
 RUN uv pip install --system -r requirements.txt
 
 # Copy source scripts into container
-COPY src/Phase_1/train.py src/Phase_1/test.py src/Phase_1/gradcam.py src/Phase_1/run.sh ./
-COPY src/Phase_1/modules/ ./modules/
-COPY src/Phase_1/configs/ ./configs/
+COPY src/modelling/train.py src/modelling/test.py src/modelling/gradcam.py src/modelling/run.sh ./
+COPY src/modelling/modules/ ./modules/
+COPY src/modelling/configs/ ./configs/
 RUN sed -i 's/\r$//' run.sh && chmod +x run.sh
 
 
