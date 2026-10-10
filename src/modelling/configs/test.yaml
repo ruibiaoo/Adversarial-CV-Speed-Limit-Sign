@@ -1,0 +1,19 @@
+# Model and test data
+model_path: "/app/runs/best.keras"
+data: "/app/data"
+split: "pixle_attacked"
+image_size: 256 # must be same as model thats was trained
+batch: 16
+
+# Keep this order the same as training
+class_names:
+  - 10_MPH
+  - 20_MPH
+  - 30_MPH
+  - 40_MPH
+  - 50_MPH
+  - 60_MPH
+  - 70_MPH
+
+# Test reports are saved here
+output_dir: "/app/results/phase2_pixle_attacked"
