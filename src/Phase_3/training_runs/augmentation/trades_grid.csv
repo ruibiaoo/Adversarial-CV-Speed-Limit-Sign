@@ -1,0 +1,3 @@
+beta,run,best_epoch,val_loss,val_accuracy,val_macro_f1,checkpoint
+1.0,trades_beta1.0,11,0.06831463426351547,0.9883268482490273,0.9854083018301977,runs/trades_beta1.0/best.keras
+6.0,trades_beta6.0,18,0.2737678587436676,0.980544747081712,0.974515960230246,runs/trades_beta6.0/best.keras
