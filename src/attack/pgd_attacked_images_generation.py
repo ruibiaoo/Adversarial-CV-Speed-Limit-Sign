@@ -71,14 +71,10 @@ def selected_parameters(selected_path: Path, sweep_config: dict) -> dict:
 
 
 def predictions_file(repo_directory: Path) -> Path:
-    candidates = (
-        repo_directory / "src" / "Phase_1" / "results" / "predictions.csv",
-        repo_directory / "src" / "Phase_1" / "results" / "test" / "predictions.csv",
-    )
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    raise FileNotFoundError(f"Phase 1 predictions.csv not found at {candidates}")
+    csv_path = repo_directory / "src" / "modelling" / "results" / "test_new" / "predictions.csv"
+    if not csv_path.is_file():
+        raise FileNotFoundError(f"Predictions file not found: {csv_path}")
+    return csv_path
 
 
 def eligible_test_images(csv_path: Path, test_root: Path, class_names: list[str]):
@@ -174,7 +170,7 @@ def main() -> None:
     csv_path = predictions_file(repo_directory)
     class_names = config["data"]["class_names"]
     selected = eligible_test_images(csv_path, source_root / "test", class_names)
-    output_root = repo_directory / "data" / "data_processed" / "pgd_attacked"
+    output_root = source_root / "pgd_attacked"
     if output_root.is_dir() and any(path.is_file() for path in output_root.rglob("*")):
         raise FileExistsError(
             f"Attacked image directory already contains files: {output_root}. "

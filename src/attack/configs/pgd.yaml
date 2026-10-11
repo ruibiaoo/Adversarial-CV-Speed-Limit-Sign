@@ -1,15 +1,15 @@
 experiment:
   seed: 42
   split: val
-  output_dir: src/Phase_2/results
+  output_dir: src/attack/results
 
 model:
-  path: src/Phase_1/runs/best.keras
+  path: src/modelling/runs/best.keras
   image_size: 256
   from_logits: false
 
 data:
-  root: data/data_processed
+  root: data/data_updated
   batch_size: 32
   class_names:
     - 10_MPH
