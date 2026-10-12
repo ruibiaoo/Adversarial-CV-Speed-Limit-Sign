@@ -4,7 +4,7 @@ import numpy as np
 
 try:
     from .pixle_attack import PixleAttack, PixleConfig, attack_with_original_l0
-except ImportError:  # Allows direct execution from the Phase_2 directory.
+except ImportError:  # Allows direct execution from the Pixle directory.
     from pixle_attack import PixleAttack, PixleConfig, attack_with_original_l0
 
 
