@@ -9,7 +9,7 @@ the training procedure.
 
 - `pixle_attack.py` contains the reusable Pixle implementation.
 - `evaluate.py` adapts a TensorFlow/Keras model and evaluates the attack on
-  `data/data_processed/test`.
+  `data/data_updated/test`.
 - `test_pixle_attack.py` contains lightweight tests for query accounting and
   initial-query reuse.
 
@@ -36,7 +36,7 @@ the attack success-rate denominator.
 From the repository root:
 
 ```bash
-PYTHONPATH=src python -m unittest Phase_2.pixle.test_pixle_attack
+PYTHONPATH=src python -m unittest attack.pixle.test_pixle_attack
 ```
 
 ## Evaluate the Phase 1 Keras model
@@ -46,20 +46,20 @@ container. Replace it with the local path to `best.keras` if running outside
 Docker.
 
 ```bash
-python src/Phase_2/pixle/evaluate.py \
+python src/attack/pixle/evaluate.py \
   --model PATH_TO_BEST_KERAS \
-  --data data/data_processed \
+  --data data/data_updated \
   --image-size 256 \
-  --results-dir src/Phase_2/pixle/results \
-  --adversarial-dir data/data_processed/pixle_attacked
+  --results-dir src/attack/pixle/results \
+  --adversarial-dir data/data_updated/pixle_attacked
 ```
 
 Outputs:
 
 ```text
-src/Phase_2/pixle/results/pixle_results.csv
-src/Phase_2/pixle/results/pixle_metrics.json
-data/data_processed/pixle_attacked/<original_class>/
+src/attack/pixle/results/pixle_results.csv
+src/attack/pixle/results/pixle_metrics.json
+data/data_updated/pixle_attacked/<original_class>/*.png
 ```
 
 The CSV reports the actual class, initial prediction, adversarial prediction,
@@ -67,7 +67,8 @@ success, model queries, and final `L0` distance for every image. Every
 initially correct image that is attacked is saved, including unsuccessful
 attacks. Successful attacks save the successful adversarial image; unsuccessful
 attacks save the last perturbed candidate. Images are grouped by their original
-class, and the CSV records the saved image path and type. The metrics JSON
+class, and the CSV records the saved image path and type. Saved adversarial
+examples are written as PNG files. The metrics JSON
 reports attack success rate over initially correct images, mean queries, and
 mean `L0`.
 
@@ -80,10 +81,10 @@ each Pixle candidate. Use `--no-progress` to disable it.
 For example, to compare patch sizes and mapping functions:
 
 ```bash
-python src/Phase_2/pixle/evaluate.py --model PATH_TO_BEST_KERAS \
+python src/attack/pixle/evaluate.py --model PATH_TO_BEST_KERAS \
   --patch-size 1 --mapping random --restarts 100 --iterations 50
 
-python src/Phase_2/pixle/evaluate.py --model PATH_TO_BEST_KERAS \
+python src/attack/pixle/evaluate.py --model PATH_TO_BEST_KERAS \
   --patch-size 3 --mapping distance_distribution \
   --restarts 100 --iterations 50
 ```

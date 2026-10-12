@@ -23,7 +23,7 @@ try:
         count_l0,
         parse_patch_size,
     )
-except ImportError:  # Allows `python Phase_2/pixle/evaluate.py` from repo root.
+except ImportError:  # Allows direct execution from the repository root.
     from pixle_attack import (
         PixleAttack,
         PixleConfig,
@@ -93,12 +93,17 @@ def load_image(path: Path, image_size: int) -> np.ndarray:
 
 
 def save_image(path: Path, image: np.ndarray) -> None:
+    """Save an attack result using the format indicated by ``path``."""
     values = np.asarray(image)
     if np.issubdtype(values.dtype, np.floating):
         if values.min() >= 0 and values.max() <= 1:
             values = values * 255.0
         values = np.clip(values, 0, 255)
-    Image.fromarray(values.astype(np.uint8), mode="RGB").save(path, quality=95)
+    output = Image.fromarray(values.astype(np.uint8), mode="RGB")
+    if path.suffix.lower() == ".png":
+        output.save(path, format="PNG", optimize=True)
+    else:
+        output.save(path, format="JPEG", quality=95)
 
 
 def iter_test_images(data_dir: Path, class_names: list[str]):
@@ -123,16 +128,16 @@ def iter_test_images(data_dir: Path, class_names: list[str]):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, required=True)
-    parser.add_argument("--data", type=Path, default=Path("data/data_processed"))
+    parser.add_argument("--data", type=Path, default=Path("data/data_updated"))
     parser.add_argument("--image-size", type=int, default=256)
     parser.add_argument("--preprocess", choices=["resnet", "none"], default="resnet")
     parser.add_argument(
-        "--results-dir", type=Path, default=Path("src/Phase_2/pixle/results")
+        "--results-dir", type=Path, default=Path("src/attack/pixle/results")
     )
     parser.add_argument(
         "--adversarial-dir",
         type=Path,
-        default=Path("data/data_processed/pixle_attacked"),
+        default=Path("data/data_updated/pixle_attacked"),
         help="Directory for class-organized adversarial examples.",
     )
     parser.add_argument("--restarts", type=int, default=100)
@@ -276,7 +281,7 @@ def main() -> None:
 
         class_output_dir = adversarial_dir / CLASS_NAMES[label]
         class_output_dir.mkdir(parents=True, exist_ok=True)
-        output_name = f"{index:04d}_{path.stem}.jpg"
+        output_name = f"{index:04d}_{path.stem}.png"
         output_path = class_output_dir / output_name
         save_image(output_path, saved_image)
 
