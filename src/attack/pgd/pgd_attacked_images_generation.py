@@ -161,7 +161,7 @@ def encode_bounded_png(
 
 def main() -> None:
     phase_directory = Path(__file__).resolve().parent
-    repo_directory = phase_directory.parents[1]
+    repo_directory = phase_directory.parents[2]  # src/attack/pgd -> repository root
     config = load_config(phase_directory / "configs" / "pgd.yaml")
     validate_attack_settings(config)
     parameters = selected_parameters(phase_directory / "configs" / "pgd_selected.yaml", config)

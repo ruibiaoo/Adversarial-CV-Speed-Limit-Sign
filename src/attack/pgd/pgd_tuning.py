@@ -394,7 +394,7 @@ def save_iteration_plots(results_frame: pd.DataFrame, output_directory: Path) ->
 
 def main():
     phase_directory = Path(__file__).resolve().parent
-    repo_directory = phase_directory.parents[1]
+    repo_directory = phase_directory.parents[2]  # src/attack/pgd -> repository root
     pgd_config = load_config(phase_directory / "configs" / "pgd.yaml")
     validate_attack_settings(pgd_config)
     validate_class_mapping(pgd_config, repo_directory)
