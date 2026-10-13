@@ -1,22 +1,21 @@
 # Phase 3 settings. Everything not listed here (model, optimizer, aug, epochs...)
-# is read from ../Phase_1/config.yaml, so the training recipe stays the same.
-data: "../data/data_processed"
-output_dir: "test_results"   # results.csv
-runs_dir: "runs"            # trained defence checkpoints
+# is read from ../Phase_1/configs/train.yaml, so the training recipe stays the same.
+data: "../data/data_processed"   # falls back to <repo>/data/data_processed if missing
+output_dir: "test_results"       # eval_preprocessing.py / eval_augmentation.py results, one folder per group
+checkpoints_dir: "checkpoints/augmentation"    # trained augmentation-defence checkpoints
 phase1_model: "../Phase_1/runs/tf_resnet50_speed_limit_aug/best/best.keras"
 
 class_names: [10_MPH, 20_MPH, 30_MPH, 40_MPH, 50_MPH, 60_MPH, 70_MPH]
 
+# Final evaluation only (eval_preprocessing.py, eval_augmentation.py). Never read by any training or tuning script.
+test_sets:
+  clean: test
+  white_box: pgd_attacked
+  black_box: pixle_attacked
+
 # --- training defences (pixel units, images are 0-255) ---
 gaussian_sigma: 8       # Gaussian augmentation: noise std
 label_smoothing: 0.1    # Label smoothing epsilon
-adv_eps: 8              # Adversarial re-training: L-inf budget
-adv_alpha: 2            # PGD step size
-adv_steps: 5            # PGD steps
-adv_ratio: 0.5          # fraction of each batch replaced by adversarial images
 
-# --- input pre-processing defences (used at test time) ---
-squeeze_bits: 5         # Feature squeezing: bit depth
-squeeze_median: 3       # Feature squeezing: median filter size
-tvm_drop_prob: 0.5      # TVM: fraction of pixels dropped
-tvm_weight: 0.1         # TVM: total variation weight
+# Preprocessing defence grids are in modules/preprocessing/defences.py (GRIDS);
+# the chosen settings are frozen in tuned_defences.yaml by tune_preprocessing.py.

@@ -1,0 +1,4 @@
+alpha,run,best_epoch,val_loss,val_accuracy,val_macro_f1,checkpoint
+0.1,mixup_alpha0.1,8,0.030346211045980453,1.0,1.0,checkpoints/augmentation/mixup_alpha0.1/best.keras
+0.2,mixup_alpha0.2,9,0.10143239796161652,0.9766536964980544,0.9679901016001852,checkpoints/augmentation/mixup_alpha0.2/best.keras
+0.4,mixup_alpha0.4,15,0.08486612141132355,0.9922178988326849,0.9958327386898816,checkpoints/augmentation/mixup_alpha0.4/best.keras

@@ -28,12 +28,12 @@ from sklearn.metrics import accuracy_score, f1_score  # noqa: E402
 from tensorflow.keras.applications.resnet import preprocess_input  # noqa: E402
 
 from modules.augmentations import build_augmenter  # noqa: E402
-from modules.common import load_config  # noqa: E402,F401
+from modules.config_loader import load_config  # noqa: E402,F401
 from modules.data import compute_class_weights  # noqa: E402
 from modules.model import build_model, get_optimizer  # noqa: E402
 
-DEFENCE_CONFIGS = PHASE3 / "defence_configs.yaml"
-TUNING = PHASE3 / "tuning" / "augmentation-tuning"  # per-epoch histories + loss report
+TUNED_DEFENCES = PHASE3 / "tuned_defences.yaml"
+TUNING = PHASE3 / "tuning_logs" / "augmentation"  # per-epoch histories + loss report
 
 
 def setup_gpu():
@@ -96,7 +96,12 @@ def evaluate(model, ds, transform=None):
             x = np.stack([transform(im.astype(np.uint8)) for im in x]).astype(np.float32)
         probs.append(model.predict_on_batch(preprocess_input(x)))
         true.extend(y.numpy())
-    probs = np.concatenate(probs)
+    return metrics(true, np.concatenate(probs))
+
+
+def metrics(true, probs):
+    """Loss, accuracy and macro F1 from integer labels and BxC class scores."""
+    true = np.asarray(true)
     pred = np.argmax(probs, axis=1)
     return {
         "loss": float(np.mean(-np.log(np.clip(probs[np.arange(len(true)), true], 1e-7, 1.0)))),
@@ -113,7 +118,7 @@ def class_weight_vector(config, num_classes):
 def train_one(name, make_step, config, tuning_csv=None):
     """Train one model. make_step(model, optimizer, class_weight, num_classes) -> tf.function(x, y) -> loss.
 
-    Saves runs/<name>/best.keras (best clean-val macro F1) and history.csv,
+    Saves checkpoints/augmentation/<name>/best.keras (best clean-val macro F1) and history.csv,
     and a copy of the history at tuning_csv if given.
     """
     tf.keras.backend.clear_session()
@@ -127,7 +132,7 @@ def train_one(name, make_step, config, tuning_csv=None):
     optimizer = get_optimizer(config)
     train_step = make_step(model, optimizer, class_weight_vector(config, num_classes), num_classes)
 
-    save_dir = Path(config["runs_dir"]) / name
+    save_dir = Path(config["checkpoints_dir"]) / name
     save_dir.mkdir(parents=True, exist_ok=True)
     history = []
     best, best_epoch, bad_epochs, lr_bad = -1.0, 0, 0, 0
@@ -171,7 +176,7 @@ def train_one(name, make_step, config, tuning_csv=None):
 
 def finished_run(name, config, tuning_csv=None):
     """Result of an already finished run (history.csv is written last), so a crashed grid can resume."""
-    save_dir = Path(config["runs_dir"]) / name
+    save_dir = Path(config["checkpoints_dir"]) / name
     if not ((save_dir / "history.csv").exists() and (save_dir / "best.keras").exists()):
         return None
     with (save_dir / "history.csv").open(encoding="utf-8") as f:
@@ -192,9 +197,9 @@ def finished_run(name, config, tuning_csv=None):
 def train_grid(defence, grid, make_step_for, config):
     """Train one model per params dict in grid, pick the best clean-val macro F1.
 
-    Ties go to the earlier (milder) setting. Writes runs/<defence>_grid.csv
-    (copied with the histories to tuning/augmentation-tuning/<defence>/) and
-    freezes the winner in defence_configs.yaml.
+    Ties go to the earlier (milder) setting. Writes checkpoints/augmentation/<defence>_grid.csv
+    (copied with the histories to tuning_logs/augmentation/<defence>/) and
+    freezes the winner in tuned_defences.yaml.
     """
     results = []
     for params in grid:
@@ -205,7 +210,7 @@ def train_grid(defence, grid, make_step_for, config):
         row = (finished_run(name, config, tuning_csv)
                or train_one(name, make_step_for(params), config, tuning_csv))
         results.append({**params, **row})
-        write_csv(Path(config["runs_dir"]) / f"{defence}_grid.csv", results)
+        write_csv(Path(config["checkpoints_dir"]) / f"{defence}_grid.csv", results)
         write_csv(TUNING / defence / "grid.csv", results)
 
     chosen = max(results, key=lambda r: r["val_macro_f1"])  # first max wins ties
@@ -229,9 +234,9 @@ def write_csv(path, rows):
 
 
 def save_choice(defence, entry):
-    """Freeze one defence's chosen parameters in defence_configs.yaml (other entries kept)."""
+    """Freeze one defence's chosen parameters in tuned_defences.yaml (other entries kept)."""
     configs = {}
-    if DEFENCE_CONFIGS.exists():
-        configs = yaml.safe_load(DEFENCE_CONFIGS.read_text(encoding="utf-8")) or {}
+    if TUNED_DEFENCES.exists():
+        configs = yaml.safe_load(TUNED_DEFENCES.read_text(encoding="utf-8")) or {}
     configs[defence] = entry
-    DEFENCE_CONFIGS.write_text(yaml.safe_dump(configs, sort_keys=False), encoding="utf-8")
+    TUNED_DEFENCES.write_text(yaml.safe_dump(configs, sort_keys=False), encoding="utf-8")

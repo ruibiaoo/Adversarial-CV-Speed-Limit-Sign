@@ -1,4 +1,0 @@
-max_area,run,best_epoch,val_loss,val_accuracy,val_macro_f1,checkpoint
-0.1,random_erasing_max_area0.1,17,0.021266495808959007,0.9961089494163424,0.9979983586540964,runs/random_erasing_max_area0.1/best.keras
-0.2,random_erasing_max_area0.2,10,0.08748790621757507,0.9883268482490273,0.9755195111689797,runs/random_erasing_max_area0.2/best.keras
-0.3,random_erasing_max_area0.3,19,0.015860646963119507,0.9961089494163424,0.9911705870180038,runs/random_erasing_max_area0.3/best.keras

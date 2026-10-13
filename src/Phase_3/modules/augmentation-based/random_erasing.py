@@ -1,24 +1,22 @@
-"""Subcategory 2 (noise / corruption augmentation): random erasing (Zhong et al., 2020).
+"""Augmentation-based defence (noise / corruption): random erasing (Zhong et al., 2020).
 
 With probability P, one random rectangle in each training image is replaced
 with uniform random pixel values. This runs after the Phase 1 albumentations
-and before preprocess_input, the same place as Gaussian augmentation.
+and before preprocess_input.
 
-Why random erasing for this project:
-- Pixle (black-box) overwrites small patches with pixels copied from elsewhere
-  in the image. Random erasing trains the model to classify signs with local
-  regions overwritten by unrelated content, which is the same kind of
-  corruption.
-- Real signs get stickers, dirt, graffiti and partial occlusion. This is the
-  physical version of the same threat.
-- Gaussian augmentation, the usual alternative, only covers dense,
-  small-amplitude noise, which is weak against PGD at 8/255 anyway. Random
-  erasing covers the sparse, large-amplitude case that Pixle actually uses.
+Why random erasing (attack-agnostic, PRD_defences.md):
+- It teaches the model not to rely on any single region of the sign, so a
+  locally corrupted or occluded input is still classified from what remains.
+- Real signs get stickers, dirt, graffiti and partial occlusion, so this is a
+  generic, physically motivated corruption, not a model of any attack.
+- Gaussian noise augmentation only covers dense, small-amplitude noise.
+  Random erasing adds the sparse, large-amplitude case.
 - The maximum erased area is capped at 0.3 of the image, because a larger
   rectangle can cover the whole digit and make the label wrong.
 
-Grid (chosen on clean val macro F1): maximum erased area in {0.1, 0.2, 0.3},
-P = 0.5, area at least 0.02, aspect ratio 0.3 to 3.3.
+Grid (Zhong et al. ranges, chosen on clean val macro F1): maximum erased area
+in {0.1, 0.2, 0.3}, P = 0.5, area at least 0.02, aspect ratio 0.3 to 3.3.
+Only train/ and clean val/ are read; no attacked image or attack setting is used.
 
   python modules/augmentation-based/random_erasing.py
   python modules/augmentation-based/random_erasing.py --max-area 0.2 --epochs 2   # quick test

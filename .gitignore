@@ -229,7 +229,7 @@ tuning/detect/
 
 # Model checkpoints and runs (exceeds GitHub 100MB limit)
 src/Phase_1/runs/
-src/Phase_3/runs/
+src/Phase_3/checkpoints/
 *.keras
 
 # Weights & Biases
