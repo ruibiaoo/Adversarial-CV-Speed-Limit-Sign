@@ -1,13 +1,14 @@
-"""Shared test-set evaluation for eval_preprocessing.py and eval_augmentation.py.
+"""Shared helpers of the test scripts: modules/preprocessing/test_defences.py and eval_augmentation.py.
 
-Test sets (config.yaml test_sets): clean test/, white-box pgd_attacked/,
-black-box pixle_attacked/. Only the evaluation scripts read them; no training
-or tuning script does. Every defence setting comes from tuned_defences.yaml,
-and evaluate() stops if a requested defence has not been tuned yet.
+Test sets: clean test/, white-box pgd_attacked/, black-box pixle_attacked/.
+Only the test scripts read them; no training or tuning script does.
 
-Selection (Phase 3 brief): worst case = min(clean, white-box, black-box)
-accuracy per defence; the defence with the largest worst case wins. The no
-defence / Phase 1 row is the reference baseline, not a candidate.
+evaluate() is used by eval_augmentation.py. Its defence settings come from
+modules/augmentation-based/tuned_defences.yaml, and it stops if a requested
+defence has not been trained yet. Selection (Phase 3 brief): worst case =
+min(clean, white-box, black-box) accuracy per defence; the defence with the
+largest worst case wins. The no defence / Phase 1 row is the reference
+baseline, not a candidate.
 """
 import argparse
 import csv
@@ -47,11 +48,11 @@ def predict_split(predict, ds):
 
 
 def parser_for(description, defences, aliases):
-    """CLI shared by both evaluation scripts. --defence picks which defences to test."""
+    """CLI shared by the test scripts. --defence picks which defences to test."""
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--defence", nargs="+", default=["all"],
                         choices=["all", *defences, *aliases],
-                        help="defences to evaluate (default: all). No defence is always included.")
+                        help="defences to evaluate (default: all). For eval_augmentation.py, no defence is always included.")
     parser.add_argument("--model", help="Phase 1 model (default: phase1_model in config.yaml)")
     parser.add_argument("--data", help="data root holding the test folders (default: config.yaml)")
     return parser
@@ -66,9 +67,10 @@ def selected(requested, defences, aliases):
 
 
 def frozen_configs(names):
+    """Frozen settings of the augmentation defences (modules/augmentation-based/tuned_defences.yaml)."""
     configs = {}
-    if T.TUNED_DEFENCES.exists():
-        configs = yaml.safe_load(T.TUNED_DEFENCES.read_text(encoding="utf-8")) or {}
+    if T.TUNED_AUGMENTATION.exists():
+        configs = yaml.safe_load(T.TUNED_AUGMENTATION.read_text(encoding="utf-8")) or {}
     missing = [n for n in names if n not in configs]
     if missing:
         raise SystemExit(f"Not tuned yet: {missing}. Tune or train them first; "
@@ -119,12 +121,12 @@ def phase1_model_path(args, config):
 def evaluate(group, predictors, order, config):
     """Run [(name, params, predict)] (baseline first) on the 3 test sets.
 
-    Writes test_results/<group>/results.csv and summary.csv. Rows of defences
+    Writes testing_results/<group>/results.csv and summary.csv. Rows of defences
     not evaluated in this call are kept from the previous results.csv, so
     `--defence median` updates only that defence (and the baseline).
     order: every defence name of the group, for a stable row order.
     """
-    out = Path(config["output_dir"]) / group  # test_results/<group>/
+    out = Path(config["output_dir"]) / group  # testing_results/<group>/
     out.mkdir(parents=True, exist_ok=True)
     T.setup_gpu()
     test_sets = {cond: load_test_set(folder, config) for cond, folder in config["test_sets"].items()}

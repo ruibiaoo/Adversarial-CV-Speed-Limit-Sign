@@ -4,11 +4,11 @@ from pathlib import Path
 import yaml
 
 PHASE3 = Path(__file__).resolve().parents[1]
-PHASE1 = PHASE3.parent / "Phase_1"
+PHASE1 = PHASE3.parent / "modelling"
 # Phase 1 moved its training config to configs/train.yaml; the old path is kept first.
 PHASE1_CONFIGS = (PHASE1 / "config.yaml", PHASE1 / "configs" / "train.yaml")
-# data_processed sits at the repo root (outside src/) when not running under Docker.
-DATA_FALLBACK = PHASE3.parents[1] / "data" / "data_processed"
+# data_updated sits at the repo root (outside src/) when not running under Docker.
+DATA_FALLBACK = PHASE3.parents[1] / "data" / "data_updated"
 
 
 def load_config():

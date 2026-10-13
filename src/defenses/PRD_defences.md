@@ -1,155 +1,221 @@
 # PRD: Phase 3 leakage-free defences
 
-Status: planned and implemented in code; tuning and evaluation runs are pending (they need the Phase 1 checkpoint).
-Owner: Phase 3. Model: Phase 1 TF ResNet50 (`Phase_1/runs/tf_resnet50_speed_limit_aug/best/best.keras`).
+Last updated: 2026-10-14. Owner: Phase 3.
 
-## 1. Goal
+## 1. Goal and status
 
-Make the Phase 1 classifier more robust to the Phase 2 attacks. Compare defences on three test sets and pick the one with the best worst case. **No defence may use attack data or attack knowledge.** The test-set scores then measure robustness to an attack the defence has never seen, rather than how well it fits that attack.
+Make the Phase 1 classifier more robust to the Phase 2 attacks, without using attack data or attack knowledge in any defence. The test scores then measure robustness to an attack the defence has never seen.
 
-The three test sets:
+| Defence type | What it is | Status |
+|---|---|---|
+| Preprocessing-based (section 4) | Filters applied to the image at test time, in front of the unchanged base classifier | **Tested** with fixed settings, alone and chained. Not tuned. |
+| Augmentation-based (section 5) | New ResNet50 models retrained with an extra training-time augmentation | **To be retrained and tuned on clean val.** The earlier models were trained on the old data split and have been deleted. |
 
-| Condition | Folder | Images | Made by |
+Base classifier: `src/modelling/runs/tf_resnet50_speed_limit_aug/best/best.keras` (TF ResNet50, 256 px, trained on `data/data_updated/train/`). The file is gitignored.
+
+## 2. Data
+
+All splits are in `data/data_updated/`.
+
+| Split | Images | Used for |
+|---|---|---|
+| `train/` | 1080 | Training the augmentation-based models |
+| `val/` (clean) | 220 | Tuning: checkpoint choice and hyperparameter choice |
+| `test/` (clean) | 115 | Final testing only |
+| `pgd_attacked/` | 115 | Final testing only. White-box PGD on the 115 test images |
+| `pixle_attacked/` | 115 | Final testing only. Black-box Pixle on the same 115 images |
+
+The base classifier scores 100% on `test/`, so both attacked sets cover every test image.
+
+## 3. The no-leakage rule
+
+A defence leaks if its training data, tuning data, settings or selection rule depends on the Phase 2 attacks.
+
+- **Data leakage:** any attacked image is used for training, tuning, early stopping or checkpoint choice. This covers the Phase 2 test sets, attacked copies of `train/` or `val/`, and adversarial examples generated during training.
+- **Knowledge leakage:** a defence setting is copied or derived from an attack setting. Examples: training against ε = 8/255 because PGD used it, or choosing a 3 × 3 median kernel because Pixle uses 3 × 3 patches.
+
+| Data | Train a defence | Tune / choose settings | Final testing |
 |---|---|---|---|
-| Clean | `data/data_processed/test/` | 131 | Phase 1 split |
-| White-box (WB) | `data/data_processed/pgd_attacked/` | 130 | Phase 2 PGD on the test images Phase 1 classified correctly |
-| Black-box (BB) | `data/data_processed/pixle_attacked/` | 130 | Phase 2 Pixle on the same 130 images |
-
-## 2. The no-leakage rule
-
-A defence leaks if any of its training data, tuning data, design parameters or selection rule depends on the Phase 2 attacks. There are two kinds.
-
-**Data leakage.** Any attacked image is used for training, tuning, early stopping or checkpoint choice. This covers:
-- the Phase 2 test sets;
-- attacked copies of `train/` or `val/` made with the Phase 2 attacks;
-- adversarial examples generated during training.
-
-A defence tuned this way learns the attack, so its WB/BB score measures fit to that attack rather than robustness.
-
-**Knowledge leakage.** A defence setting is copied or derived from the attacks. Examples:
-- training against ε = 8/255 because Phase 2 PGD used 8/255;
-- choosing a median kernel because Pixle uses 3×3 patches;
-- tuning on FGSM or CW examples, which still tells the defence the attack family.
-
-For the black-box attack this also breaks the threat model: the defender is not supposed to know the attack.
-
-### Data-usage matrix
-
-| Data | Train a defence | Tune / choose settings | Final evaluation |
-|---|---|---|---|
-| `train/` (clean) | yes (augmentation defences only) | no | no |
+| `train/` (clean) | yes (augmentation-based only) | no | no |
 | `val/` (clean) | no | **yes, the only tuning data** | no |
 | `test/` (clean) | no | no | yes |
 | `pgd_attacked/`, `pixle_attacked/` | **no** | **no** | yes |
-| Attacked copies of train/val (any attack) | **no** | **no** | no |
-| Attack settings (ε, step, patch size, queries) | **no** | **no** | n/a |
+| Attacked copies of train or val (any attack) | **no** | **no** | no |
+| Attack settings (ε, step size, patch size, queries) | **no** | **no** | n/a |
 
-`tune_preprocessing.py` enforces this in code: `check_tuning_split()` rejects any split other than `val`, and any path containing `attacked`. The evaluation scripts `eval_preprocessing.py` and `eval_augmentation.py` are the only scripts that read the test folders. They refuse to test a defence that has no frozen setting in `tuned_defences.yaml`.
+Only two scripts read the test folders: `modules/preprocessing/test_defences.py` and `modules/augmentation-based/eval_augmentation.py`.
 
-## 3. Feasibility of tuning on each candidate data source
+## 4. Preprocessing-based defences
 
-| Candidate tuning data | Verdict | Reason |
-|---|---|---|
-| Phase 2 WB/BB test sets | Forbidden | Direct test leakage, so the X/Y/Z scores become optimistic. |
-| Attacked train/val made with the Phase 2 attacks | Forbidden | The setting is fitted to the exact attack and budget. Even a single number (q, σ, k) picked by attacked accuracy is a fit to the attack. For BB it also breaks the threat model. |
-| Other attacks on val (FGSM, CW, other patch attacks) | Forbidden for selection | Same threat family, so it still leaks the attack type. It could be a clearly labelled post-hoc sensitivity analysis, but it is never used to choose a setting. |
-| Clean val with a clean-accuracy budget | **Used** | Attack-agnostic. Each preprocessing defence has one setting with a monotone strength order (lower JPEG quality, larger σ, larger kernel all remove more detail). The rule is "strongest setting that keeps clean accuracy within budget", which needs no attack. |
-| Literature defaults with no tuning | Acceptable fallback | Zero leakage. The grids below contain these defaults (JPEG q = 75, median k = 3–5, small σ). |
-| Clean test | Forbidden for tuning | Evaluation only. |
+### 4.1 Methods
 
-**Conclusion.** Tuning is feasible for every planned method, using clean val only. Clean val shows what a setting costs on clean images, not how much it buys against attacks. The robustness side therefore comes from the strength order of each defence, not from attacked data. This is a deliberate trade-off: the chosen settings may be weaker than the "best against PGD/Pixle" settings, but the test scores are honest.
+Each defence changes the input image at test time. The base classifier is not retrained. Code: `modules/preprocessing/defences.py`.
 
-## 4. Planned methods
-
-### 4.1 Preprocessing defences (test time, same frozen Phase 1 model)
-
-These follow the Phase 3 diagram: 3 test sets × {no defence, D1, D2, D3} = 12 pairings. Code: `modules/preprocessing/defences.py`.
-
-| | Defence | Method | Setting and grid (mildest first) | Why it is attack-agnostic |
-|---|---|---|---|---|
-| D1 | JPEG compression | Encode and decode the input as JPEG at quality q | q ∈ {90, 75, 60, 50, 40, 30} | Generic removal of high-frequency detail (Das et al. 2017; Guo et al. 2018). The grid is the usual JPEG quality range. |
-| D2 | Gaussian randomized smoothing | n = 32 copies with N(0, σ²) noise; the prediction is the majority vote (Cohen et al. 2019). Fixed seed 4266, no abstain | σ ∈ {4, 8, 12, 16, 24} (0–255 scale) | Averages the model over random noise, so the decision depends less on any small input change. σ is limited by the clean-accuracy budget, not by an attack budget. |
-| D3 | Median smoothing | k × k median filter per channel | k ∈ {3, 5, 7} | Standard edge-preserving denoiser for impulse and local corruption. It is a different family from D1 (frequency domain) and D2 (noise averaging). |
-
-Median smoothing is a preprocessing defence, not an augmentation defence: it changes nothing in training. It was moved out of `modules/augmentation-based/` for this reason.
-
-Methods considered and not chosen for D3:
-- **Bit-depth reduction:** little extra over D1 and D3.
-- **Total-variation minimisation:** slow, and overlaps D2.
-- **Random resize and pad:** mainly aimed at gradient-based attacks.
-
-Notes:
-- **D1:** the clean crops and the Pixle images are already JPEG q95, so q = 90 is close to an identity on them. That is why the grid goes down to 30.
-- **D2:** the Phase 1 model was never trained with noise, so clean accuracy will fall quickly as σ grows and the budget will likely cap σ low. No certified radius is claimed; D2 is an empirical defence here. n and the seed are fixed before any run and are not tuned.
-
-### 4.2 Augmentation-based defences (training time, retrained models)
-
-| Defence | Method | Grid | Frozen choice (clean val) |
+| Defence | Method | Fixed setting | Why it is attack-agnostic |
 |---|---|---|---|
-| Random erasing | With p = 0.5, one random rectangle (area 0.02 to max_area, aspect 0.3–3.3) is replaced with uniform noise during training | max_area ∈ {0.1, 0.2, 0.3} | max_area = 0.1 (val acc 0.9961, macro F1 0.998) |
-| Mixup | Blend image pairs and their labels, λ ~ Beta(α, α) | α ∈ {0.1, 0.2, 0.4} | α = 0.1 (val acc 1.0, macro F1 1.0) |
+| JPEG compression | Encode and decode the image as JPEG | quality 75 | Generic removal of high-frequency detail (Das et al. 2017; Guo et al. 2018). 75 is the common default quality. |
+| Median smoothing | k × k median filter per channel | 3 × 3 | Standard denoiser for impulse and local corruption. 3 × 3 is the smallest kernel. |
+| Gaussian randomized smoothing | 32 copies with N(0, σ²) noise; the prediction is the majority vote (Cohen et al. 2019) | σ = 8 on the 0-255 scale, seed 4266 | Averages the model over random noise, so the decision depends less on any small input change. No certified radius is claimed. |
 
-Both train on `train/` only, using the Phase 1 recipe. Both pick their checkpoint and setting on clean `val/` macro F1. They are already trained, and their choices are in `tuned_defences.yaml`. These defences produce new models, so they do not fit the diagram's "same Phase 1 model" comparison and get their own table (section 5).
+### 4.2 Settings are fixed, not tuned
 
-### 4.3 Excluded: TRADES and all adversarial training
+The settings above are commonly used defaults, chosen before any test run and not taken from any attack setting. No tuning was done: the planned tuning script (`tune_preprocessing.py`) was never run and has been removed, along with `eval_preprocessing.py`. This has zero leakage, but the settings are not optimised.
+
+### 4.3 What was tested
+
+`modules/preprocessing/test_defences.py` tests 15 pipelines on the three test sets:
+
+- each defence alone (3)
+- every ordered chain of two defences (6) and of three defences (6); order matters
+
+In a chain, the filters run left to right. Gaussian smoothing makes its 32 noisy copies at its position, the later filters run on every copy, and the predictions are majority-voted.
+
+Metrics are the ones Phase 2 used: the script imports the metric and report functions of `src/modelling/test.py` and calls them unchanged. The undefended classifier is not tested by this script, because Phase 2 already tested it with `src/modelling/test.py`. An earlier run that included it produced a `classification_report.txt` identical to Phase 2's on all three test sets.
+
+### 4.4 Results
+
+Accuracy on 115 images per test set. One image is about 0.87 points.
+
+| Pipeline | Clean | PGD | Pixle |
+|---|---|---|---|
+| no defence (Phase 2 result) | 100% | 0.0% | 60.0% |
+| jpeg | 99.1% | 17.4% | 95.7% |
+| gaussian | 98.3% | 3.5% | 96.5% |
+| median | 100% | 2.6% | 100% |
+| jpeg → gaussian | 98.3% | 74.8% | 98.3% |
+| median → gaussian | 99.1% | 53.0% | 99.1% |
+| gaussian → jpeg | 98.3% | 49.6% | 97.4% |
+| gaussian → median | 100% | 49.6% | 100% |
+| jpeg → median | 100% | 48.7% | 100% |
+| median → jpeg | 99.1% | 46.1% | 98.3% |
+| jpeg → median → gaussian | 98.3% | **87.0%** | 98.3% |
+| median → jpeg → gaussian | 98.3% | 82.6% | 99.1% |
+| jpeg → gaussian → median | **100%** | 80.0% | **100%** |
+| gaussian → median → jpeg | 99.1% | 76.5% | 100% |
+| median → gaussian → jpeg | 99.1% | 73.0% | 99.1% |
+| gaussian → jpeg → median | 100% | 73.0% | 100% |
+
+Findings:
+
+- **Clean cost is small.** Every pipeline scores 98.3% to 100% on clean images. Only two test images are ever misclassified.
+- **Pixle is handled by any defence.** Accuracy rises from 60% to 95.7% or more.
+- **PGD needs stacking.** Single defences reach at most 17.4%. Pairs average 53.6% and triples 78.7%.
+- **Order matters.** JPEG works best first and Gaussian smoothing best last: jpeg → gaussian scores 74.8% on PGD, the reverse order 49.6%.
+
+The full analysis is in `testing_results/preprocessing_based/summary.md`.
+
+### 4.5 Outputs
+
+```
+testing_results/preprocessing_based/
+  summary.md                       ranked table and written analysis
+  summary.csv                      one row per pipeline and test set
+  <pipeline>/<test|pgd_attacked|pixle_attacked>/
+    classification_report.txt      per-class precision, recall, f1-score, support
+    test_metrics.txt               all overall and per-class metrics
+    confusion_matrix.txt
+    confusion_matrix_normalized.txt
+    predictions.csv
+```
+
+Pipeline folders are named `jpeg`, `jpeg_then_median`, `jpeg_then_median_then_gaussian`, and so on.
+
+### 4.6 Limitations
+
+- **The PGD attack did not know about the defences.** The PGD images were crafted against the undefended model. An adaptive attack on the full pipeline (BPDA, EOT; Athalye et al. 2018) would likely do better, so the PGD figures are an upper bound.
+- **The ranking was made on the test set.** With 15 pipelines compared on 115 images, the best pipeline's score is a selected score, not an unbiased estimate.
+- **Small sample.** Differences of 1 to 3 images are not meaningful on their own.
+- **Vote shares are not probabilities.** Any chain with Gaussian smoothing outputs vote shares, so loss, ROC AUC and average precision are not comparable with the other pipelines. Compare accuracy and F1.
+- **Randomness.** Gaussian smoothing depends on the noise draw. The seed is fixed, but another seed can move accuracy by about one image.
+
+## 5. Augmentation-based defences
+
+### 5.1 Methods
+
+Each defence is a new ResNet50 trained with the Phase 1 recipe plus one extra per-batch augmentation. Code: `modules/augmentation-based/`, sharing `_trainer.py`.
+
+| Defence | Method | Grid | Why it is attack-agnostic |
+|---|---|---|---|
+| Random erasing (Zhong et al. 2020) | With p = 0.5, one random rectangle (area 0.02 to max_area, aspect 0.3 to 3.3) is replaced with uniform noise | max_area ∈ {0.1, 0.2, 0.3} | Teaches the model not to rely on any single region of the sign. Models real occlusion such as stickers and dirt. |
+| Mixup (Zhang et al. 2018) | Blend image pairs and their labels, λ ~ Beta(α, α) | α ∈ {0.1, 0.2, 0.4} | Keeps the decision boundary further from each training image, so small input changes of any kind are less likely to flip the class. |
+
+The grids are the ranges of the original papers. Nothing in them comes from an attack setting.
+
+### 5.2 Status
+
+- An earlier round trained and tuned both defences on the **old** split: `data/data_processed/train/` (865 images) and clean `data/data_processed/val/` (257 images). It chose 0.1 for both. The record is in `tuning_logs/augmentation_based/`.
+- The base classifier now uses `data/data_updated/`, so those models no longer match it. Their checkpoints were deleted and they have not been tested on the new attacked sets.
+- `modules/augmentation-based/tuned_defences.yaml` still holds the old choices and points at the deleted checkpoints. The retraining in 5.3 overwrites it.
+
+### 5.3 Tuning plan: clean val only
+
+1. **Train.** For each grid value, train one model on `data/data_updated/train/` (1080 images) with the Phase 1 recipe: ResNet50, 256 px, the Phase 1 augmentations, Adam at 3e-4, batch 16, seed 4266, learning-rate reduction and early stopping on val macro F1.
+2. **Choose the checkpoint.** For each run, keep the epoch with the best macro F1 on clean `data/data_updated/val/` (220 images).
+3. **Choose the setting.** For each defence, pick the grid value with the best clean-val macro F1. Ties go to the milder setting (the smaller value).
+4. **Freeze.** Write the chosen setting and checkpoint to `modules/augmentation-based/tuned_defences.yaml`. Testing reads settings only from this file.
+
+Why clean val is the right tuning data:
+
+- It is attack-agnostic: no attacked image and no attack setting is involved, so section 3 holds.
+- It selects the model that keeps the most clean accuracy. It does not show how much robustness a setting buys. The robustness argument comes from the method itself, not from the tuning.
+- The consequence is deliberate: the chosen setting may be weaker than the "best against PGD or Pixle" setting, but the test scores are honest.
+
+Tuning on attacked images, or on other attacks such as FGSM, is not allowed for selection (section 3).
+
+### 5.4 Testing plan
+
+After tuning, `eval_augmentation.py` tests the chosen random-erasing and mixup models, with the base classifier as the no-defence baseline, on `test/`, `pgd_attacked/` and `pixle_attacked/`. It stops if a defence has no frozen setting or its checkpoint is missing.
+
+It currently reports accuracy with a 95% Wilson interval, macro F1 and an exact McNemar p-value against no defence, in `testing_results/augmentation_based/results.csv` and `summary.csv`.
+
+One point to interpret with care: the PGD and Pixle images were crafted against the base classifier. For a retrained model they are transferred attacks, which are usually weaker than attacks crafted against that model directly.
+
+### 5.5 Open items
+
+- [ ] Retrain both grids on `data/data_updated/` and freeze the choices (5.3). Training needs a GPU; TF 2.16.2 does not run on an RTX 50-series card (see section 8).
+- [ ] `eval_augmentation.py` was moved into `modules/augmentation-based/`. Confirm it runs from there (it imports `modules` from `src/defenses/`).
+- [ ] The training code writes its tuning record to `tuning_logs/augmentation/`, while the existing record is in `tuning_logs/augmentation_based/`. Make the two names agree before retraining.
+- [ ] Make `eval_augmentation.py` write the same five Phase 2 report files as the preprocessing test, so both defence types are compared on the same metrics.
+- [ ] Decide whether to also test the preprocessing pipelines in front of the retrained models.
+
+## 6. Excluded: TRADES and all adversarial training
 
 TRADES was removed from Phase 3, for two reasons:
-- **It generates adversarial data:** PGD examples are made from `train/` on the fly during training.
-- **Its budget came from the attack:** ε = 8/255 and step 2/255 were copied from the Phase 2 white-box PGD.
 
-That is both data leakage and knowledge leakage under section 2, and its WB score would be close to in-distribution. PGD-AT and Fast-AT are excluded for the same reason. The script, its `run_all.sh` step, its `tuned_defences.yaml` entry and the `adv_*` settings in `config.yaml` have been removed.
+- **It generates adversarial data:** PGD examples are made from `train/` during training.
+- **Its budget came from the attack:** ε = 8/255 and step 2/255 were copied from the Phase 2 PGD.
 
-## 5. Tuning and evaluation protocol
-
-**Tuning (fixed before running):**
-1. **Preprocessing** (`tune_preprocessing.py`): measure clean-val accuracy with no defence, then for each grid setting. Choose the **strongest setting whose accuracy drop is at most 1 point**. If none qualifies, use the mildest setting and set `within_tolerance: false`. The choices are frozen in `tuned_defences.yaml`. Outputs go to the directories in section 5.1.
-2. **Augmentation** (training scripts): best clean-val macro F1, ties going to the milder setting. This is unchanged.
-
-**Evaluation**: one script per defence group. Each runs after tuning, with frozen settings only. `--defence` selects which defences to test (default `all`), and no defence is always included as the baseline.
-- `eval_preprocessing.py --defence {jpeg, gaussian, median, all}`: the preprocessing defences on the Phase 1 model. With `all` this gives the 12 pairings.
-- `eval_augmentation.py --defence {random_erasing (or erasing), mixup, all}`: the retrained models against the Phase 1 model. With `all` this gives 9 pairings.
-- A run with only some defences replaces their rows in the results and keeps the rest, so the summary always covers every defence tested so far.
-- For each pairing it records accuracy with a 95% Wilson CI, macro F1, n, and an exact McNemar p-value against no defence on the same images. For the clean test set it also records accuracy on the 130 images that the attacked sets were made from.
-- **Selection:** worst case W_i = min(X_i, Y_i, Z_i) (clean, WB, BB accuracy). The defence with the largest W_i is chosen. No defence / Phase 1 is the reference baseline, not a candidate.
-- Output: `test_results/<group>/results.csv` and `summary.csv`.
-
-### 5.1 Output directories
-
-Each defence group gets its own directory under `checkpoints/` (tuning runs) and under `tuning_logs/` (tuning record). The scripts create these directories if they are missing, and never write one group's files into another group's directory. The preprocessing defences follow the same layout as the augmentation defences.
-
-| Group | Tuning runs (`checkpoints/`) | Tuning record (`tuning_logs/`) | Final evaluation |
-|---|---|---|---|
-| Preprocessing (D1–D3) | `checkpoints/preprocessing/`: `<defence>_grid.csv` for each tuning run, `logs/tune_preprocessing.log` | `tuning_logs/preprocessing/`: `<defence>_grid.csv` (clean-val accuracy, macro F1, loss and drop for each setting, with no defence as the first row), `summary.csv` (one row per defence: chosen setting, val accuracy, drop, within tolerance) | `test_results/preprocessing/`: `results.csv`, `summary.csv` |
-| Augmentation (random erasing, Mixup) | `checkpoints/augmentation/`: `<defence>_<param><value>/best.keras` + `history.csv`, `<defence>_grid.csv`, `logs/` | `tuning_logs/augmentation/`: per-epoch histories, `grid.csv` for each defence, `summary.csv`, `loss_report.md`, loss plots | `test_results/augmentation/`: `results.csv`, `summary.csv` |
-
-`tuned_defences.yaml` holds the frozen setting of every defence and is the only file the evaluation scripts read settings from.
-
-## 6. Risks and limitations
-
-- **Val resolution.** Val has 257 images, so 1 point is about 2.6 images, and settings whose scores differ by less than the tolerance are statistically tied. The fixed rule ("strongest within budget") breaks the tie the same way every time instead of chasing noise.
-- **Optimistic clean val.** Clean val was already used to pick the Phase 1 checkpoint and to tune the Phase 2 PGD settings. The no-defence val accuracy is close to 1.0, which makes the 1-point budget relative to a slightly optimistic baseline. No attacked pixels are involved, so this is not attack leakage.
-- **The final pick is made on test.** The brief chooses the winner by argmax of the worst case over the test sets. With only three candidates the selection bias is small, but the winner's score is a *selected* score, not an unbiased estimate.
-- **Non-adaptive attacks.** The WB images were crafted against the undefended model, so the preprocessing defences face a gray-box attack that does not know about them. The results do not show robustness to adaptive attacks such as BPDA or EOT (Athalye et al. 2018). That is out of scope.
-- **Subset.** WB/BB contain only the 130 images Phase 1 got right, so WB/BB accuracy is accuracy among images that were originally correct. Clean accuracy is reported on both the full 131 and the 130 subset.
-- **Randomness in D2.** Predictions depend on the noise draw. A fixed seed makes them reproducible, but a different seed can move accuracy by about one image.
+That is both data leakage and knowledge leakage under section 3. PGD-AT and Fast-AT are excluded for the same reason.
 
 ## 7. Acceptance criteria
 
-- [x] No training or tuning script reads `pgd_attacked/`, `pixle_attacked/` or any attacked folder, and `check_tuning_split()` rejects them.
-- [x] No defence setting is taken from a Phase 2 attack setting. TRADES and the `adv_*` keys are removed.
-- [x] D1–D3 are implemented as test-time functions behind one predictor interface (`make_predictor`).
-- [ ] `tune_preprocessing.py` writes 3 grid CSVs to both `checkpoints/preprocessing/` and `tuning_logs/preprocessing/`, `tuning_logs/preprocessing/summary.csv`, and 3 frozen entries in `tuned_defences.yaml`. Needs the Phase 1 checkpoint.
-- [ ] `eval_preprocessing.py --defence all` writes 12 rows, and the no-defence row reproduces Phase 1/2: clean 0.9924, BB about 0.377 (Pixle success rate 0.623).
-- [ ] `eval_augmentation.py --defence all` writes 9 rows.
-- [ ] Both `summary.csv` files name the chosen defence and its worst case.
+Preprocessing-based:
+
+- [x] No training or tuning script reads an attacked folder.
+- [x] No defence setting is taken from an attack setting.
+- [x] All 15 pipelines are tested on the clean, PGD and Pixle sets.
+- [x] The metrics match Phase 2: an earlier run with the undefended classifier reproduced Phase 2's `classification_report.txt` on all three sets.
+- [x] Results and analysis are in `testing_results/preprocessing_based/`.
+
+Augmentation-based:
+
+- [ ] Both grids are retrained on `data/data_updated/train/`, with checkpoint and setting chosen on clean `val/` only.
+- [ ] `modules/augmentation-based/tuned_defences.yaml` holds the new choices.
+- [ ] The chosen models are tested on the clean, PGD and Pixle sets, with results in `testing_results/augmentation_based/`.
 
 ## 8. How to run
 
+From `src/defenses/`:
+
 ```bash
-cd src/Phase_3
-python tune_preprocessing.py --model ../Phase_1/runs/tf_resnet50_speed_limit_aug/best/best.keras
-python eval_preprocessing.py --defence all        # or e.g. --defence jpeg median
-python eval_augmentation.py --defence all         # or e.g. --defence mixup
+docker compose build
+
+# preprocessing-based: test all 15 pipelines (finished pairings are reused; --rerun forces them)
+docker compose run --rm -e CUDA_VISIBLE_DEVICES=-1 phase3 python modules/preprocessing/test_defences.py
+
+# augmentation-based: train both grids and freeze the choices, then test
+docker compose run --rm phase3 bash modules/augmentation-based/run_all.sh
+docker compose run --rm phase3 python modules/augmentation-based/eval_augmentation.py
 ```
 
-Or run everything that trains or tunes with `bash modules/augmentation-based/run_all.sh`. Evaluation is run separately, on purpose.
+`-e CUDA_VISIBLE_DEVICES=-1` runs on CPU. The image uses TF 2.16.2, which cannot run its GPU kernels on an RTX 50-series card (`CUDA_ERROR_INVALID_PTX`). A fresh preprocessing test takes about 45 minutes on CPU.

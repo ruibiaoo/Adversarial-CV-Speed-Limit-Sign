@@ -12,8 +12,8 @@ make_predictor() turns any defence into fn(batch_uint8) -> class scores, so the
 evaluation treats the four options (including no defence) the same way.
 
 No attack data or attack knowledge is used here: the grids come from general
-image-processing ranges and are calibrated on clean val only
-(tune_preprocessing.py, PRD_defences.md).
+image-processing ranges. They are not tuned at the moment: test_defences.py
+tests one fixed setting per defence.
 """
 import cv2
 import numpy as np
@@ -87,7 +87,7 @@ def transform_for(name, params):
 
 
 def make_predictor(name, model, params=None):
-    """fn(uint8 BxHxWx3) -> BxC class scores for one defence in front of model."""
+    """fn(BxHxWx3 images in 0-255, uint8 or float) -> BxC class scores for one defence in front of model."""
     from tensorflow.keras.applications.resnet import preprocess_input
 
     params = params or {}
@@ -104,8 +104,56 @@ def make_predictor(name, model, params=None):
     transform = transform_for(name, params)
 
     def predict(images):
-        if transform is not None:
+        if transform is not None:  # the filters work on uint8, so round the resized image first
+            images = np.clip(np.rint(images), 0, 255).astype(np.uint8)
             images = np.stack([transform(im) for im in images])
         return np.asarray(classify(images))
+
+    return predict
+
+
+def _to_uint8(images):
+    return np.clip(np.rint(images), 0, 255).astype(np.uint8)
+
+
+def make_chain_predictor(steps, model, params):
+    """fn(BxHxWx3 images in 0-255) -> BxC class scores for several defences applied in order.
+
+    steps: defence names in the order they are applied, e.g. [JPEG, GAUSSIAN, MEDIAN].
+    params: {name: params dict}. JPEG and MEDIAN filter the image at their position.
+    GAUSSIAN turns the image into n noisy copies at its position; the later steps
+    then run on every copy and the model's predictions are majority-voted, as in
+    randomized smoothing. Without GAUSSIAN the output is the model's softmax.
+    """
+    from tensorflow.keras.applications.resnet import preprocess_input
+
+    def classify(x):
+        return model.predict_on_batch(preprocess_input(np.array(x, dtype=np.float32)))
+
+    def filtered(images, names):
+        for name in names:
+            transform = transform_for(name, params[name])
+            images = np.stack([transform(im) for im in _to_uint8(images)])
+        return images
+
+    if GAUSSIAN not in steps:
+        return lambda images: np.asarray(classify(filtered(images, steps)))
+
+    at = steps.index(GAUSSIAN)
+    before, after = steps[:at], steps[at + 1:]
+    sigma = float(params[GAUSSIAN]["sigma"])
+    n = int(params[GAUSSIAN].get("samples", SMOOTHING_SAMPLES))
+    seed = int(params[GAUSSIAN].get("seed", SMOOTHING_SEED))
+
+    def predict(images):
+        rng = np.random.default_rng(seed)  # fixed per call, as in randomized_smoothing_probs
+        counts = []
+        for start in range(0, len(images), 2):  # 2 images x n copies per model call
+            batch = filtered(images[start:start + 2], before)
+            noisy = gaussian_noise(np.repeat(batch, n, axis=0), sigma, rng)
+            scores = np.asarray(classify(filtered(noisy, after)))
+            pred = np.argmax(scores, axis=1).reshape(len(batch), n)
+            counts += [np.bincount(p, minlength=scores.shape[1]) for p in pred]
+        return np.stack(counts).astype(np.float32) / float(n)
 
     return predict

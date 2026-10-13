@@ -1,13 +1,13 @@
 # Phase 3 settings. Everything not listed here (model, optimizer, aug, epochs...)
-# is read from ../Phase_1/configs/train.yaml, so the training recipe stays the same.
-data: "../data/data_processed"   # falls back to <repo>/data/data_processed if missing
-output_dir: "test_results"       # eval_preprocessing.py / eval_augmentation.py results, one folder per group
+# is read from ../modelling/configs/train.yaml, so the training recipe stays the same.
+data: "../../data/data_updated"   # falls back to <repo>/data/data_updated if missing
+output_dir: "testing_results"    # all test results land here
 checkpoints_dir: "checkpoints/augmentation"    # trained augmentation-defence checkpoints
-phase1_model: "../Phase_1/runs/tf_resnet50_speed_limit_aug/best/best.keras"
+phase1_model: "../modelling/runs/tf_resnet50_speed_limit_aug/best/best.keras"
 
 class_names: [10_MPH, 20_MPH, 30_MPH, 40_MPH, 50_MPH, 60_MPH, 70_MPH]
 
-# Final evaluation only (eval_preprocessing.py, eval_augmentation.py). Never read by any training or tuning script.
+# Test sets of eval_augmentation.py. Never read by any training or tuning script.
 test_sets:
   clean: test
   white_box: pgd_attacked
@@ -18,4 +18,4 @@ gaussian_sigma: 8       # Gaussian augmentation: noise std
 label_smoothing: 0.1    # Label smoothing epsilon
 
 # Preprocessing defence grids are in modules/preprocessing/defences.py (GRIDS);
-# the chosen settings are frozen in tuned_defences.yaml by tune_preprocessing.py.
+# they are not tuned at the moment: test_defences.py tests one fixed setting per defence (FIXED).

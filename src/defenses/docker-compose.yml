@@ -2,15 +2,15 @@ services:
   phase3:
     build:
       context: ..
-      dockerfile: Phase_3/Dockerfile
+      dockerfile: defenses/Dockerfile
     image: speed-limit-classifier:phase3-tf
     volumes:
-      - ..:/repo          # Phase_1 code, Phase_1 model, data, and Phase_3/outputs
-    working_dir: /repo/Phase_3
+      - ../..:/repo       # whole repo: data/, src/modelling (code + base model), src/defenses
+    working_dir: /repo/src/defenses
     environment:
-      # Keep the CUDA PTX JIT cache between runs. TF 2.15 has no native kernels
+      # Keep the CUDA PTX JIT cache between runs. TF has no native kernels
       # for newer GPUs (e.g. RTX 50xx), so the first run compiles everything.
-      CUDA_CACHE_PATH: /repo/Phase_3/.cuda_cache
+      CUDA_CACHE_PATH: /repo/src/defenses/.cuda_cache
       CUDA_CACHE_MAXSIZE: "4294967296"
     shm_size: '8gb'
     deploy:

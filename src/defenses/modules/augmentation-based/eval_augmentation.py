@@ -1,22 +1,22 @@
 """Test the augmentation-based defences on the clean, white-box and black-box test sets.
 
 Each defence is a model retrained with that augmentation; its checkpoint is
-the one frozen in tuned_defences.yaml by the training scripts. The Phase 1
+the one frozen in modules/augmentation-based/tuned_defences.yaml by the training scripts. The Phase 1
 model (no defence) is always evaluated as the baseline.
 
   python eval_augmentation.py                                   # all: random_erasing, mixup
   python eval_augmentation.py --defence mixup
   python eval_augmentation.py --defence erasing mixup
-  python eval_augmentation.py --defence all --model path/to/phase1/best.keras --data path/to/data_processed
+  python eval_augmentation.py --defence all --model path/to/phase1/best.keras --data path/to/data_updated
 
 --defence takes the names in tuned_defences.yaml (random_erasing, mixup),
-the short name erasing, or all. Results: test_results/augmentation/results.csv
+the short name erasing, or all. Results: testing_results/augmentation_based/results.csv
 and summary.csv. Rows of defences not tested in a run are kept from the previous run.
 """
 from modules import evaluation as E
 from modules.preprocessing import defences as D
 
-GROUP = "augmentation"
+GROUP = "augmentation_based"  # results folder inside testing_results/
 DEFENCES = ["random_erasing", "mixup"]
 ALIASES = {"erasing": "random_erasing"}
 

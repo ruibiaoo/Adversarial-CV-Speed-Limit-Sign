@@ -92,7 +92,8 @@ def best_epoch(hist):
 
 def main():
     out = T.TUNING
-    configs = yaml.safe_load(T.TUNED_DEFENCES.read_text(encoding="utf-8")) or {}
+    configs = (yaml.safe_load(T.TUNED_AUGMENTATION.read_text(encoding="utf-8")) or {}
+               if T.TUNED_AUGMENTATION.exists() else {})
     rows = []
 
     for defence, (title, param) in DEFENCES.items():

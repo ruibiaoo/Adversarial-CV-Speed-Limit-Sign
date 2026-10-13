@@ -32,7 +32,10 @@ from modules.config_loader import load_config  # noqa: E402,F401
 from modules.data import compute_class_weights  # noqa: E402
 from modules.model import build_model, get_optimizer  # noqa: E402
 
-TUNED_DEFENCES = PHASE3 / "tuned_defences.yaml"
+# Frozen settings live next to the module that writes them: augmentation choices
+# in modules/augmentation-based/, preprocessing choices in modules/preprocessing/.
+TUNED_AUGMENTATION = PHASE3 / "modules" / "augmentation-based" / "tuned_defences.yaml"
+TUNED_PREPROCESSING = PHASE3 / "modules" / "preprocessing" / "tuned_defences.yaml"
 TUNING = PHASE3 / "tuning_logs" / "augmentation"  # per-epoch histories + loss report
 
 
@@ -199,7 +202,7 @@ def train_grid(defence, grid, make_step_for, config):
 
     Ties go to the earlier (milder) setting. Writes checkpoints/augmentation/<defence>_grid.csv
     (copied with the histories to tuning_logs/augmentation/<defence>/) and
-    freezes the winner in tuned_defences.yaml.
+    freezes the winner in modules/augmentation-based/tuned_defences.yaml.
     """
     results = []
     for params in grid:
@@ -220,7 +223,7 @@ def train_grid(defence, grid, make_step_for, config):
         "val_accuracy": round(chosen["val_accuracy"], 4),
         "val_macro_f1": round(chosen["val_macro_f1"], 4),
         "selected_on": "clean val macro F1",
-    })
+    }, TUNED_AUGMENTATION)
     print(f"\nChosen {defence}: {json.dumps(chosen)}", flush=True)
     return chosen
 
@@ -233,10 +236,15 @@ def write_csv(path, rows):
         writer.writerows(rows)
 
 
-def save_choice(defence, entry):
-    """Freeze one defence's chosen parameters in tuned_defences.yaml (other entries kept)."""
+def save_choice(defence, entry, path):
+    """Freeze one defence's chosen parameters in its group's tuned_defences.yaml.
+
+    path is TUNED_AUGMENTATION or TUNED_PREPROCESSING; other entries already in
+    that file are kept.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
     configs = {}
-    if TUNED_DEFENCES.exists():
-        configs = yaml.safe_load(TUNED_DEFENCES.read_text(encoding="utf-8")) or {}
+    if path.exists():
+        configs = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     configs[defence] = entry
-    TUNED_DEFENCES.write_text(yaml.safe_dump(configs, sort_keys=False), encoding="utf-8")
+    path.write_text(yaml.safe_dump(configs, sort_keys=False), encoding="utf-8")

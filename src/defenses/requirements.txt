@@ -1,2 +1,2 @@
--r ../Phase_1/requirements.txt
+-r ../modelling/requirements.txt
 scikit-image>=0.21.0

@@ -229,10 +229,10 @@ tuning/detect/
 
 # Model checkpoints and runs (exceeds GitHub 100MB limit)
 src/Phase_1/runs/
-src/Phase_3/checkpoints/
+src/defenses/checkpoints/
 *.keras
 
 # Weights & Biases
 src/Phase_1/wandb/
 wandb/
-src/Phase_3/.cuda_cache/
+src/defenses/.cuda_cache/
