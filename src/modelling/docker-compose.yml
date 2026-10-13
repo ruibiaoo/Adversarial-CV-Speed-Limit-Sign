@@ -1,0 +1,36 @@
+services:
+  phase1-classifier:
+    build:
+      context: ../..
+      dockerfile: src/modelling/Dockerfile
+    image: speed-limit-classifier:phase1-tf
+    container_name: phase1_tf_train
+    environment:
+      PYTHONUNBUFFERED: "1"
+      CUDA_VISIBLE_DEVICES: "0"
+      # CUDA_VISIBLE_DEVICES: "-1"
+      WANDB_API_KEY: ${WANDB_API_KEY:-}
+      WANDB_ENTITY: hongyaok-hongyaok
+    volumes:
+      # Mount dataset directory from repo root as read-only
+      - ../../data/data_updated:/app/data:ro
+      - ./:/app
+      - ./train.py:/app/train.py:ro
+      - ./test.py:/app/test.py:ro
+      - ./gradcam.py:/app/gradcam.py:ro
+      - ./run.sh:/app/run.sh:ro
+      - ./modules:/app/modules:ro
+      - ./configs:/app/configs:ro
+      - ./results:/app/results
+      - ./runs:/app/runs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    # Allocate shared memory for data loading to avoid bus errors
+    shm_size: '8gb'
+    ipc: host
+    command: [ "bash", "-c", "sed 's/\\r$$//' run.sh | bash" ]
