@@ -31,6 +31,6 @@ services:
               count: all
               capabilities: [ gpu ]
     # Allocate shared memory for data loading to avoid bus errors
-    shm_size: '8gb'
+    shm_size: '16gb'
     ipc: host
     command: [ "bash", "-c", "sed 's/\\r$$//' run.sh | bash" ]
