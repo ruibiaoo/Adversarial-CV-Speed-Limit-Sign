@@ -11,13 +11,21 @@ workers: 0 # Load data in the training process to reduce RAM usage.
 image_size: 256
 device: 0
 project: "/app/runs"
-name: "tf_resnet50_speed_limit_aug_2"
+name: "tf_resnet50_robust_1"
 
 # model, change this to try other backbones
 model_name: resnet50 # resnet50, resnet101
-pretrained: true # use imagenet weights
+pretrained: /app/runs/best_baseline.keras # true (imagenet), false (random init), or path to checkpoint (e.g. "/app/runs/best.keras")
 freeze_backbone: false # if true, only train the last layer first
 dropout: 0.4
+
+# robust training (Equation 3 in arXiv:1906.00945v2, page 4)
+robust: true # toggle true to use RobustModel (PGD adversarial training)
+robust_norm: l2 # l2 (paper default) or linf
+robust_eps: 3.0 # perturbation budget eps in [0, 1] space (e.g. 3.0 for l2, 0.03137 or 8 for linf)
+robust_step_size: 0.5 # PGD step size in [0, 1] space (e.g. 0.5 for l2, 0.00784 or 2 for linf)
+robust_steps: 7 # PGD iterations (Table 3 in paper uses 7)
+robust_random_start: true # random init inside the eps-ball before PGD steps
 
 # optimizer
 optimizer: adam # sgd, adam, adamw

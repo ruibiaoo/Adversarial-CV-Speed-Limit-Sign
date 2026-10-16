@@ -13,14 +13,23 @@ def _is_true(value, default=False):
 
 def build_model(config, num_classes):
     """Make a resnet classifier with imagenet weights and a new head."""
+    if _is_true(config.get("robust", False), default=False):
+        from .robustmodel import build_robust_model
+
+        return build_robust_model(config, num_classes)
+
+    from .robustmodel import _parse_pretrained_setting, load_checkpoint_weights
+
     model_name = str(config.get("model_name", "resnet50")).lower()
     image_size = int(config.get("image_size", 224))
     dropout = float(config.get("dropout", 0.2) or 0.0)
-    pretrained = _is_true(config.get("pretrained", True), default=True)
+    pretrained_mode, checkpoint_path = _parse_pretrained_setting(
+        config.get("pretrained", True)
+    )
     freeze_backbone = _is_true(config.get("freeze_backbone", False), default=False)
     weight_decay = float(config.get("weight_decay", 0.0001) or 0.0)
 
-    weights = "imagenet" if pretrained else None
+    weights = "imagenet" if pretrained_mode == "imagenet" else None
     input_shape = (image_size, image_size, 3)
 
     if model_name == "resnet50":
@@ -53,7 +62,15 @@ def build_model(config, num_classes):
         kernel_regularizer=tf.keras.regularizers.l2(weight_decay) if weight_decay > 0 else None,
     )(x)
 
-    return tf.keras.Model(inputs, outputs)
+    model = tf.keras.Model(inputs, outputs)
+    if pretrained_mode == "checkpoint" and checkpoint_path is not None:
+        load_checkpoint_weights(
+            model,
+            backbone,
+            checkpoint_path,
+            freeze_backbone=freeze_backbone,
+        )
+    return model
 
 
 def get_optimizer(config):
