@@ -72,7 +72,7 @@ def make_train_ds(config):
         out.set_shape((size, size, 3))
         return out, label
 
-    ds = load_split("train", config, shuffle=True)
+    ds = load_split(config["splits"]["train"], config, shuffle=True)
     if augmenter is not None:
         ds = ds.map(aug, num_parallel_calls=1)
     ds = ds.map(lambda x, y: (tf.cast(x, tf.float32), y))
@@ -80,8 +80,8 @@ def make_train_ds(config):
 
 
 def val_batches(config):
-    """Clean val split, float 0-255, batched, fixed order."""
-    return load_split("val", config, shuffle=False).map(
+    """Val split (from data.yaml), float 0-255, batched, fixed order."""
+    return load_split(config["splits"]["val"], config, shuffle=False).map(
         lambda x, y: (tf.cast(x, tf.float32), y)
     ).batch(int(config["batch"]))
 

@@ -3,11 +3,15 @@
 data: "../../data/data_updated"   # falls back to <repo>/data/data_updated if missing
 output_dir: "testing_results"    # all test results land here
 checkpoints_dir: "checkpoints/augmentation"    # trained augmentation-defence checkpoints
-phase1_model: "../modelling/runs/tf_resnet50_speed_limit_aug/best/best.keras"
+phase1_model: "../../best_robust.keras"    # base classifier at the repo root (resolved from src/defenses/)
 
+# class_names and the train/val/test split folders come from <data>/data.yaml (config_loader).
+# This list is only the fallback if data.yaml is missing; data.yaml wins.
 class_names: [10_MPH, 20_MPH, 30_MPH, 40_MPH, 50_MPH, 60_MPH, 70_MPH]
 
-# Test sets of eval_augmentation.py. Never read by any training or tuning script.
+# Final-eval test sets. The clean entry is overridden with data.yaml's `test` split by config_loader;
+# the attacked sets live here because a YOLO data.yaml only expresses one `test`.
+# Never read by any training or tuning script.
 test_sets:
   clean: test
   white_box: pgd_attacked

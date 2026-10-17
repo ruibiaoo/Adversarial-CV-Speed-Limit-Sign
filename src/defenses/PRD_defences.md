@@ -8,10 +8,11 @@ Make the Phase 1 classifier more robust to the Phase 2 attacks, without using at
 
 | Defence type | What it is | Status |
 |---|---|---|
-| Preprocessing-based (section 4) | Filters applied to the image at test time, in front of the unchanged base classifier | **Tested** with fixed settings, alone and chained. Not tuned. |
-| Augmentation-based (section 5) | New ResNet50 models retrained with an extra training-time augmentation | **To be retrained and tuned on clean val.** The earlier models were trained on the old data split and have been deleted. |
+| Preprocessing-based (section 4) | Filters applied to the image at test time, in front of the unchanged base classifier | **Tested**, alone and chained. Settings can now be tuned on val (`tune_preprocessing.py`). |
+| Post-processing-based (section 4B) | ART transforms of the output probability vector at test time | **Scripts added.** Tuned on val, tested alone and chained. |
+| Augmentation-based (section 5) | New ResNet50 models retrained with an extra training-time augmentation | **To be retrained and tuned on val.** The earlier models were trained on the old data split and have been deleted. |
 
-Base classifier: `src/modelling/runs/tf_resnet50_speed_limit_aug/best/best.keras` (TF ResNet50, 256 px, trained on `data/data_updated/train/`). The file is gitignored.
+Base classifier: `best_robust.keras` at the repo root (TF ResNet50, 256 px, trained on `data/data_updated/train/`). The file is gitignored.
 
 ## 2. Data
 
@@ -43,7 +44,11 @@ A defence leaks if its training data, tuning data, settings or selection rule de
 | Attacked copies of train or val (any attack) | **no** | **no** | no |
 | Attack settings (ε, step size, patch size, queries) | **no** | **no** | n/a |
 
-Only two scripts read the test folders: `modules/preprocessing/test_defences.py` and `modules/augmentation-based/eval_augmentation.py`.
+Only the test scripts read the test folders: `modules/preprocessing/test_defences.py`, `modules/post-processing/test_postprocessing.py` and `modules/augmentation-based/eval_augmentation.py`.
+
+### 3.1 Update (2026-10-17): tuning on an attacked validation split
+
+The split that a run uses for `train`/`val`/`test` is now read from `data/data_updated/data.yaml` (the YOLO spec; see `config_loader.py`). Tuning is allowed to use an **attacked validation split** (an attacked copy of `val/`), set by pointing `val:` in `data.yaml` at that folder. This is a deliberate relaxation of the "attacked copies of val → no tuning" row above: it lets a defence be tuned against an attack while the **attacked test splits (`pgd_attacked/`, `pixle_attacked/`) remain final-eval only**, so the headline test scores are still unbiased. Knowledge leakage still applies in full: no defence setting is ever copied or derived from an attack setting (ε, step size, patch size, queries). `CLAUDE.md` still records the stricter original rule and should be reconciled with this note.
 
 ## 4. Preprocessing-based defences
 
@@ -127,6 +132,34 @@ Pipeline folders are named `jpeg`, `jpeg_then_median`, `jpeg_then_median_then_ga
 - **Small sample.** Differences of 1 to 3 images are not meaningful on their own.
 - **Vote shares are not probabilities.** Any chain with Gaussian smoothing outputs vote shares, so loss, ROC AUC and average precision are not comparable with the other pipelines. Compare accuracy and F1.
 - **Randomness.** Gaussian smoothing depends on the noise draw. The seed is fixed, but another seed can move accuracy by about one image.
+
+## 4B. Post-processing-based defences
+
+### 4B.1 Methods
+
+Each defence transforms the base classifier's output probability vector at test time; the image and the model are untouched. Code: `modules/post-processing/defences.py`, on the [Adversarial Robustness Toolbox](https://github.com/Trusted-AI/adversarial-robustness-toolbox) postprocessors.
+
+| Defence | Method | Grid (mild → strong) | Why it is attack-agnostic |
+|---|---|---|---|
+| Gaussian noise | Add N(0, scale²) to the probability vector, then renormalise (ART `GaussianNoise`) | scale ∈ {0.01, 0.05, 0.1, 0.2, 0.3} | A generic way to hide the exact scores from a score-based attacker. The grid is on the output scale, not any attack budget. |
+| High confidence | Zero every probability below a cutoff (ART `HighConfidence`) | cutoff ∈ {0.1, 0.25, 0.5, 0.75, 0.9} | Returns only confident mass, so a query attacker sees a coarse vector. Cutoffs are generic thresholds. |
+| Reverse sigmoid | Add a reverse-sigmoid perturbation that scrambles the vector while keeping the top class (Lee et al. 2019) | gamma ∈ {0.1, 0.2, 0.3, 0.5}, beta = 1.0 | Designed exactly to mislead score/gradient-based extraction while preserving the argmax. Parameters are the paper's ranges. |
+
+ART's fourth postprocessor, `Rounded`, is excluded: it only truncates probabilities to a number of decimals, never changes the argmax, and leaks almost the full vector — the weakest of the four.
+
+### 4B.2 Why the tuning objective is not "best val macro F1"
+
+These defences change the output vector, not the image, so the top-1 class (hence accuracy and macro F1) barely moves on any split, clean or attacked. "Best val macro F1" would pick the mildest setting every time. Their actual purpose is to deny a score-based attacker (e.g. Pixle) usable output while not hurting the honest user. So `tune_postprocessing.py` picks, per defence, the setting that **maximises output obfuscation** (mean top-1 confidence drop + mean output-entropy increase vs the undefended base) **among the settings whose val macro F1 is within a tolerance τ (default 0.01) of the undefended baseline**. Tuned on val only (clean or attacked val per §3.1); the test splits are never read.
+
+### 4B.3 What is tested
+
+`modules/post-processing/test_postprocessing.py` tests the same shape as preprocessing: each defence alone and every ordered chain of two and three (order matters — the postprocessors compose on the output vector), 15 pipelines, on the clean and attacked test sets. It writes the five Phase-2 report files per pipeline/test-set and a `summary.md` that reports accuracy and macro F1 plus the clean-split cross-entropy, mean confidence and mean entropy (the obfuscation signal).
+
+### 4B.4 Limitations
+
+- **Accuracy is not the right headline.** On already-attacked, static images these defences cannot recover the flipped argmax; read the probability-side columns.
+- **Selection is on obfuscation, not robustness.** The chosen setting maximises output distortion within a val-accuracy budget, not test robustness.
+- **Chains after noise.** In a chain, a postprocessor may receive a vector another one already distorted; this is intended (order is part of the search), but reverse sigmoid in particular is defined for probability-like inputs.
 
 ## 5. Augmentation-based defences
 

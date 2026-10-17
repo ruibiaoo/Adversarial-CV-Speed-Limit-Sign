@@ -4,8 +4,8 @@ Defences against the Phase 2 attacks (white-box PGD, black-box Pixle) for the Ph
 
 ## Setup
 
-- Base classifier: put `best.keras` at `src/modelling/runs/tf_resnet50_speed_limit_aug/best/best.keras` (gitignored), or pass `--model`.
-- Data: `data/data_updated/` at the repo root, or pass `--data`.
+- Base classifier: `best_robust.keras` at the repo root (set as `phase1_model` in `config.yaml`, gitignored), or pass `--model`.
+- Data: `data/data_updated/` at the repo root, or pass `--data`. Its `data.yaml` is the source of truth for the class order and for which folders are the `train`/`val`/`test` splits (read by `config_loader.py`). To tune a defence against an attack, point `val:` in `data.yaml` at an attacked-val folder and re-run; the test splits stay untouched.
 - Build the image once, from `src/defenses/`:
 
 ```bash
@@ -20,10 +20,10 @@ Run all commands from `src/defenses/`.
 ### Test the preprocessing-based defences
 
 ```bash
-# all 15 pipelines on the three test sets
+# all 16 pipelines on the three test sets
 docker compose run --rm -e CUDA_VISIBLE_DEVICES=-1 phase3 python modules/preprocessing/test_defences.py
 
-# Eg. only the pipelines made of some defences (combinations can only contain jpeg, median)
+# Eg. only the pipelines made of some defences (combinations can only contain jpeg, median) 
 docker compose run --rm -e CUDA_VISIBLE_DEVICES=-1 phase3 python modules/preprocessing/test_defences.py --defence jpeg median
 
 # predict everything again, ignoring saved results
@@ -34,6 +34,24 @@ docker compose run --rm -e CUDA_VISIBLE_DEVICES=-1 phase3 python modules/preproc
 - A fresh run takes about 45 minutes on CPU. A pairing that already has `predictions.csv` is reused, so a repeat run takes seconds.
 - With `--defence`, `summary.csv` and `summary.md` list only that run's pipelines. A plain run restores the full table.
 - The `## Analysis` section of `summary.md` is written by hand and is kept when the table is regenerated.
+
+### Tune the preprocessing-based defences
+
+```bash
+# sweep each defence's grid on the val split (from data.yaml), freeze the best val macro-F1 setting
+docker compose run --rm -e CUDA_VISIBLE_DEVICES=-1 phase3 python modules/preprocessing/tune_preprocessing.py
+```
+
+Writes `modules/preprocessing/tuned_defences.yaml` and `tuning_logs/preprocessing/<defence>/grid.csv`. Afterwards `test_defences.py` uses the tuned settings automatically (it falls back to the fixed defaults when the file is absent, and prints which source it used).
+
+### Tune and test the post-processing defences
+
+```bash
+# tune on val, then test alone + all ordered chains on the clean and attacked test sets
+docker compose run --rm phase3 bash modules/post-processing/run_all.sh
+```
+
+Three ART output-side defences (Gaussian noise, high-confidence thresholding, reverse sigmoid). See [modules/post-processing/README.md](modules/post-processing/README.md) for the defences, the tuning objective, and why `Rounded` is excluded.
 
 ### Train and test the augmentation-based defences
 
@@ -62,7 +80,8 @@ python modules/preprocessing/test_defences.py
 
 | Defence type | Defences | Status |
 |---|---|---|
-| Preprocessing-based | JPEG compression, median smoothing, Gaussian randomized smoothing | **Tested**, alone and chained, with fixed settings |
+| Preprocessing-based | JPEG compression, median smoothing, Gaussian randomized smoothing | **Tested**, alone and chained. Settings can now be tuned on val (`tune_preprocessing.py`) |
+| Post-processing-based | Gaussian noise, high-confidence thresholding, reverse sigmoid (ART) | Scripts added: tuned on val, tested alone and chained. Output-side defences — see `modules/post-processing/` |
 | Augmentation-based | Random erasing, mixup (retrained models) | **Not tested yet.** Needs retraining on the current data (see below) |
 
 ### Preprocessing-based defences
@@ -75,17 +94,17 @@ Each defence filters the image at test time, in front of the unchanged base clas
 | Median smoothing | 3 x 3 kernel |
 | Gaussian randomized smoothing | σ = 8 (0-255 scale), 32 noisy copies, majority vote, seed 4266 |
 
-The test covers 15 pipelines: each defence alone, and every ordered chain of two and three defences. The undefended classifier is not tested here; Phase 2 already did that with `src/modelling/test.py`. Each pipeline is tested on three sets of 115 images from `data/data_updated/`:
+The test covers 16 pipelines: no defence, each defence alone, and every ordered chain of two and three defences. Each pipeline is tested on three sets of 115 images from `data/data_updated/`:
 
 - `test/`: clean images, to show what a defence costs on normal inputs
 - `pgd_attacked/`: white-box attack
 - `pixle_attacked/`: black-box attack
 
-Accuracy of the single defences and the best chains, with Phase 2's result for the undefended classifier as the reference:
+Accuracy of the baseline, the single defences and the best chains:
 
 | Pipeline | Clean | PGD | Pixle |
 |---|---|---|---|
-| no defence (Phase 2 result) | 100% | 0.0% | 60.0% |
+| no defence | 100% | 0.0% | 60.0% |
 | jpeg | 99.1% | 17.4% | 95.7% |
 | median | 100% | 2.6% | 100% |
 | gaussian | 98.3% | 3.5% | 96.5% |
@@ -98,9 +117,9 @@ Accuracy of the single defences and the best chains, with Phase 2's result for t
 - PGD needs chained defences: single defences reach at most 17.4%, three-defence chains 73% to 87%.
 - The PGD images were crafted against the undefended model, so the PGD figures are an upper bound.
 
-All 15 pipelines and the written analysis are in [testing_results/preprocessing_based/summary.md](testing_results/preprocessing_based/summary.md).
+All 16 pipelines and the written analysis are in [testing_results/preprocessing_based/summary.md](testing_results/preprocessing_based/summary.md).
 
-The metrics are the ones Phase 2 used. The test script imports the metric and report functions of `src/modelling/test.py` and calls them unchanged. An earlier run that included the undefended classifier produced a `classification_report.txt` identical to Phase 2's on all three sets.
+The metrics are the ones Phase 2 used. The test script imports the metric and report functions of `src/modelling/test.py` and calls them unchanged, and its no-defence `classification_report.txt` is identical to Phase 2's on all three sets.
 
 ### Augmentation-based defences
 
@@ -114,7 +133,7 @@ Random erasing and mixup are training-time defences: each is a separately retrai
 
 ```
 testing_results/preprocessing_based/
-  summary.md                         ranked table of all 15 pipelines + written analysis
+  summary.md                         ranked table of all 16 pipelines + written analysis
   summary.csv                        one row per pipeline and test set
   <pipeline>/<test|pgd_attacked|pixle_attacked>/
     classification_report.txt        per-class precision, recall, f1-score, support
@@ -122,13 +141,18 @@ testing_results/preprocessing_based/
     confusion_matrix.txt
     confusion_matrix_normalized.txt
     predictions.csv                  every image: true class, predicted class, probabilities
+testing_results/post_processing_based/  same five files per chain/test set + summary.{csv,md} (accuracy, macro F1, and clean-split obfuscation)
 testing_results/augmentation_based/  eval_augmentation.py: results.csv, summary.csv (empty until retraining)
+tuning_logs/preprocessing/           per-setting val scores from tune_preprocessing.py
+tuning_logs/post-processing/         per-setting val scores + obfuscation from tune_postprocessing.py
 tuning_logs/augmentation_based/      record of the earlier tuning on the old split
 checkpoints/augmentation/            trained models and per-run histories (gitignored)
+modules/preprocessing/tuned_defences.yaml        frozen settings of the preprocessing defences (if tuned)
+modules/post-processing/tuned_defences.yaml      frozen settings of the post-processing defences
 modules/augmentation-based/tuned_defences.yaml   frozen settings of the augmentation-based defences
 ```
 
-Pipeline folders are named `jpeg`, `jpeg_then_median`, `jpeg_then_median_then_gaussian`, and so on. Chains apply left to right.
+Pipeline folders are named `no_defence`, `jpeg`, `jpeg_then_median`, `jpeg_then_median_then_gaussian`, and so on. Chains apply left to right.
 
 For any chain with Gaussian smoothing, the class scores are vote shares over the 32 noisy copies, not model probabilities. Compare accuracy and F1 across pipelines, not loss or ROC AUC.
 
@@ -137,7 +161,11 @@ For any chain with Gaussian smoothing, the class scores are vote shares over the
 | File | Purpose |
 |---|---|
 | `modules/preprocessing/defences.py` | The three preprocessing defences and the chain predictor |
+| `modules/preprocessing/tune_preprocessing.py` | Tunes the preprocessing defences on val, freezes the winners |
 | `modules/preprocessing/test_defences.py` | Tests the preprocessing pipelines and writes the reports |
+| `modules/post-processing/defences.py` | The three ART post-processing defences and the chain predictor |
+| `modules/post-processing/tune_postprocessing.py` | Tunes the post-processing defences on val (max obfuscation within tolerance) |
+| `modules/post-processing/test_postprocessing.py` | Tests the post-processing pipelines, alone and chained |
 | `modules/augmentation-based/random_erasing.py`, `mixup.py` | Train one model per grid value |
 | `modules/augmentation-based/_trainer.py` | Shared training loop (the Phase 1 recipe) |
 | `modules/augmentation-based/report.py` | Builds the loss report from the training histories |

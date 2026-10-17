@@ -1,6 +1,8 @@
-"""Quick test of the preprocessing defences on the clean and attacked test sets, with fixed settings.
+"""Test the preprocessing defences on the clean and attacked test sets.
 
-Nothing is tuned here: each defence uses one commonly used setting (FIXED).
+Each defence uses its tuned setting from modules/preprocessing/tuned_defences.yaml
+if tune_preprocessing.py has been run; otherwise it falls back to one commonly
+used default (FIXED). The settings source is printed at startup.
 Every defence runs at test time in front of the same base classifier
 (phase1_model in config.yaml). The script tests each defence alone and the
 defences chained together in every order (order matters: jpeg then median is
@@ -36,6 +38,7 @@ if str(PHASE3) not in sys.path:
     sys.path.insert(0, str(PHASE3))
 
 import numpy as np  # noqa: E402
+import yaml  # noqa: E402
 from sklearn.metrics import classification_report  # noqa: E402
 
 from modules import evaluation as E  # noqa: E402
@@ -43,15 +46,14 @@ from modules.preprocessing import defences as D  # noqa: E402
 
 T = E.T  # shared helpers (config, data loading, write_csv)
 
-# Fixed, untuned settings. General image-processing defaults, not taken from any attack setting.
+# Fixed, untuned defaults. General image-processing values, not taken from any attack setting.
+# tune_preprocessing.py may override these per defence (see resolve_settings).
 FIXED = {
     D.JPEG: {"quality": 75},
     D.MEDIAN: {"kernel": 3},
     D.GAUSSIAN: {"sigma": 8, "samples": D.SMOOTHING_SAMPLES, "seed": D.SMOOTHING_SEED},
 }
 ALIASES = {"jpeg": D.JPEG, "median": D.MEDIAN, "gaussian": D.GAUSSIAN}
-# clean test images, then the same images attacked white-box (PGD) and black-box (Pixle)
-TEST_SETS = ["test", "pgd_attacked", "pixle_attacked"]
 GROUP = "preprocessing_based"  # results folder inside testing_results/
 ANALYSIS_HEADING = "## Analysis"  # summary.md: everything from this heading on is written by hand
 SUMMARY_METRICS = ["accuracy", "balanced_accuracy", "f1_macro", "precision_macro", "recall_macro",
@@ -118,25 +120,30 @@ def chains(names):
     return out
 
 
-def write_markdown(path, summary):
-    """One row per chain: accuracy and macro F1 on the three test sets, best worst-case first."""
+def write_markdown(path, summary, splits, settings):
+    """One row per chain: accuracy and macro F1 on each test set, best worst-case first.
+
+    splits: the test-set folder names in column order (from config["test_sets"], so the clean
+    split follows data.yaml). settings: the per-defence params actually used (tuned or FIXED).
+    """
     rows = {}
     for r in summary:
         rows.setdefault(r["defence"], {})[r["test_set"]] = r
     table = sorted(rows.items(), key=lambda kv: -min(r["accuracy"] for r in kv[1].values()))
-    lines = ["# Preprocessing defences, alone and chained (fixed settings)", "",
-             f"Settings: {', '.join(f'{SHORT[n]} {p}' for n, p in FIXED.items())}.",
-             "Sorted by the worst of the three accuracies. Chains are applied left to right.",
-             "Clean = test/ (unattacked), PGD = pgd_attacked/, Pixle = pixle_attacked/; 115 images each.", "",
-             "| Rank | Chain | Defences | Clean accuracy | PGD accuracy | Pixle accuracy "
-             "| Clean macro F1 | PGD macro F1 | Pixle macro F1 | Worst accuracy |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+    acc_cols = " ".join(f"| {s} accuracy " for s in splits)
+    f1_cols = " ".join(f"| {s} macro F1 " for s in splits)
+    header = f"| Rank | Chain | Defences {acc_cols}{f1_cols}| Worst accuracy |"
+    lines = ["# Preprocessing defences, alone and chained", "",
+             f"Settings: {', '.join(f'{SHORT[n]} {settings[n]}' for n in FIXED)}.",
+             "Sorted by the worst accuracy across the test sets. Chains are applied left to right.",
+             f"Test sets (from data.yaml / config.yaml): {', '.join(splits)}.", "",
+             header, "|---|---|---|" + "---|" * (2 * len(splits) + 1)]
     for rank, (name, r) in enumerate(table, 1):
-        clean, pgd, pixle = r["test"], r["pgd_attacked"], r["pixle_attacked"]
+        accs = [r[s]["accuracy"] for s in splits]
+        f1s = [r[s]["f1_macro"] for s in splits]
+        cells = "".join(f" {a:.4f} |" for a in accs) + "".join(f" {f:.4f} |" for f in f1s)
         lines.append(f"| {rank} | {name.replace('_then_', ' → ')} | {name.count('_then_') + 1} "
-                     f"| {clean['accuracy']:.4f} | {pgd['accuracy']:.4f} | {pixle['accuracy']:.4f} "
-                     f"| {clean['f1_macro']:.4f} | {pgd['f1_macro']:.4f} | {pixle['f1_macro']:.4f} "
-                     f"| {min(x['accuracy'] for x in (clean, pgd, pixle)):.4f} |")
+                     f"|{cells} {min(accs):.4f} |")
     # the hand-written analysis below the table is kept when the table is regenerated
     analysis = ""
     if path.exists():
@@ -144,6 +151,22 @@ def write_markdown(path, summary):
         if ANALYSIS_HEADING in previous:
             analysis = "\n" + previous[previous.index(ANALYSIS_HEADING):]
     path.write_text("\n".join(lines) + "\n" + analysis, encoding="utf-8")
+
+
+def resolve_settings():
+    """Per-defence params: the tuned value from tuned_defences.yaml if present, else the FIXED default.
+
+    tune_preprocessing.py freezes {defence: {params: {...}, ...}} there. For Gaussian the tuned grid
+    only stores sigma, so the FIXED samples/seed are kept as defaults under it.
+    """
+    settings = {name: dict(params) for name, params in FIXED.items()}
+    tuned = {}
+    if T.TUNED_PREPROCESSING.exists():
+        tuned = yaml.safe_load(T.TUNED_PREPROCESSING.read_text(encoding="utf-8")) or {}
+    for name in settings:
+        if name in tuned and isinstance(tuned[name].get("params"), dict):
+            settings[name] = {**settings[name], **tuned[name]["params"]}
+    return settings, bool(tuned)
 
 
 def main():
@@ -154,17 +177,19 @@ def main():
     names = E.selected(args.defence, list(FIXED), ALIASES)
     config = E.load_config(args)
     class_names = list(config["class_names"])
+    settings, tuned = resolve_settings()
+    print(f"Settings source: {'tuned_defences.yaml' if tuned else 'FIXED defaults'}", flush=True)
     out = Path(config["output_dir"]) / GROUP  # testing_results/preprocessing_based/
     out.mkdir(parents=True, exist_ok=True)
 
     T.setup_gpu()
     P2 = load_phase2_test()
     model = E.load_model(E.phase1_model_path(args, config))
-    predictors = [(label, {SHORT[n]: FIXED[n] for n in steps},
-                   D.make_chain_predictor(steps, model, FIXED)) for label, steps in chains(names)]
+    predictors = [(label, {SHORT[n]: settings[n] for n in steps},
+                   D.make_chain_predictor(steps, model, settings)) for label, steps in chains(names)]
 
     summary = []
-    for split in TEST_SETS:
+    for split in list(config["test_sets"].values()):
         ds = T.load_split(split, config, shuffle=False)
         file_paths = list(ds.file_paths)
         ds = ds.batch(int(config["batch"]))
@@ -179,7 +204,7 @@ def main():
             print(f"\n===== {name} {params} on {split} =====\n{report}", flush=True)
             T.write_csv(out / "summary.csv", summary)  # rewritten after every run, so progress is kept
 
-    write_markdown(out / "summary.md", summary)
+    write_markdown(out / "summary.md", summary, list(config["test_sets"].values()), settings)
     print(f"Results written to {out}")
 
 
