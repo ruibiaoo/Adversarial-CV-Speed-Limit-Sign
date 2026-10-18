@@ -1,7 +1,7 @@
 # Model and test data
-model_path: "/app/runs/best_robust.keras"
+model_path: "/app/runs/best_robustv2.keras"
 data: "/app/data"
-split: "test"
+split: "pixle_attacked" 
 image_size: 256 # must be same as model thats was trained
 batch: 16
 
@@ -16,4 +16,4 @@ class_names:
   - 70_MPH
 
 # Test reports are saved here
-output_dir: "/app/results/test_robust"
+output_dir: "/app/results/pixle_attacked_robustv2"
