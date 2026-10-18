@@ -2,6 +2,7 @@
 # training
 data: "/app/data"
 epochs: 300
+save_latest_best: true
 early_stopping_patience: 20
 reduce_lr_patience: 4
 reduce_lr_factor: 0.2

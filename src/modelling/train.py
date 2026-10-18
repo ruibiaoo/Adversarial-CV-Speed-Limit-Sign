@@ -119,14 +119,18 @@ def train_once(cfg, track):
     early_stopping_patience = int(cfg.get("early_stopping_patience", 5))
     min_learning_rate = float(cfg.get("min_learning_rate", 0.000001))
 
+    checkpoint = tf.keras.callbacks.ModelCheckpoint(
+        str(save_dir / "best.keras"),
+        monitor="val_macro_f1",
+        mode="max",
+        save_best_only=True,
+    )
+    if cfg.get("save_latest_best", False):
+        checkpoint.monitor_op = lambda current, best: current >= best
+
     callbacks = [
         ValidationMacroF1(val_ds),
-        tf.keras.callbacks.ModelCheckpoint(
-            str(save_dir / "best.keras"),
-            monitor="val_macro_f1",
-            mode="max",
-            save_best_only=True,
-        ),
+        checkpoint,
         tf.keras.callbacks.ReduceLROnPlateau(
             monitor="val_macro_f1",
             mode="max",
