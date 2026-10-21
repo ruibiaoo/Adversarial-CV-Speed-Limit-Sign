@@ -6,17 +6,17 @@ used default (FIXED). The settings source is printed at startup.
 Every defence runs at test time in front of the same base classifier
 (phase1_model in config.yaml). The script tests each defence alone and the
 defences chained together in every order (order matters: jpeg then median is
-not median then jpeg). The undefended classifier is not tested here: Phase 2
-already did that with src/modelling/test.py.
+not median then jpeg). The undefended classifier (no_defence) is tested too, as
+the reference row: the same base model on the same test sets, with no filter.
 
 Run from src/defenses/:
 
-  python modules/preprocessing/test_defences.py                       # jpeg, median, gaussian: 15 pipelines
+  python modules/preprocessing/test_defences.py                       # no_defence + 15 pipelines
   python modules/preprocessing/test_defences.py --defence jpeg median # only the pipelines made of these
-  python modules/preprocessing/test_defences.py --model path/to/best.keras --data path/to/data_updated
+  python modules/preprocessing/test_defences.py --model path/to/best.keras --data path/to/data_root
 
-Test sets: test (clean, shows what a defence costs on normal images),
-pgd_attacked (white-box) and pixle_attacked (black-box).
+Test sets: config.yaml `test_sets` — the clean test split (shows what a defence costs on
+normal images), a white-box PGD copy and a black-box Pixle copy of it.
 
 The metrics and report files are the ones Phase 2 used to score the attacks:
 the functions of src/modelling/test.py are imported and called unchanged.
@@ -25,10 +25,12 @@ classification_report.txt, test_metrics.txt, confusion_matrix.txt,
 confusion_matrix_normalized.txt and predictions.csv. In the same folder, summary.csv
 has one row per pipeline and test set, summary.md one ranked table. Both list
 only the pipelines of the current run. A pairing whose predictions.csv already
-exists is not predicted again; --rerun forces it.
+exists is not predicted again if its run.json (setting, model, data folder) still
+matches; --rerun forces it.
 """
 import csv
 import importlib.util
+import json
 import sys
 from itertools import permutations
 from pathlib import Path
@@ -98,10 +100,31 @@ def predict_split(predict, ds):
     return np.asarray(true), np.concatenate(probs)
 
 
-def saved_predictions(path, class_names):
-    """(true, probs) of an earlier run, read back from its predictions.csv, or None."""
+RUN_FILE = "run.json"  # next to predictions.csv: the setting, model and data folder it was made with
+
+
+def run_key(params, model_path, folder):
+    """What a saved prediction depends on, JSON-normalised so it compares equal after a round trip."""
+    key = {"setting": params, "model": str(model_path), "data": str(folder)}
+    return json.loads(json.dumps(key, sort_keys=True, default=str))
+
+
+def save_run_key(out, key):
+    (out / RUN_FILE).write_text(json.dumps(key, sort_keys=True, indent=1), encoding="utf-8")
+
+
+def saved_predictions(path, class_names, key=None):
+    """(true, probs) of an earlier run, read back from its predictions.csv, or None.
+
+    With key, the earlier run is reused only if its run.json matches (same setting, model and data
+    folder), so re-tuning a defence or switching the model/data never reuses stale predictions.
+    """
     if not path.exists():
         return None
+    if key is not None:
+        run = path.parent / RUN_FILE
+        if not run.exists() or json.loads(run.read_text(encoding="utf-8")) != key:
+            return None
     with path.open(encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     true = np.array([class_names.index(r["actual_class"]) for r in rows])
@@ -112,9 +135,14 @@ def saved_predictions(path, class_names):
 SHORT = {v: k for k, v in ALIASES.items()}
 
 
+def size_of(name):
+    """Number of defences in a chain label (0 for the no-defence baseline)."""
+    return 0 if name == D.NO_DEFENCE else name.count("_then_") + 1
+
+
 def chains(names):
-    """Each single defence, then every ordered chain of 2 and 3 of them."""
-    out = []
+    """The no-defence baseline, each single defence, then every ordered chain of 2 and 3 of them."""
+    out = [(D.NO_DEFENCE, [])]  # same base model, no filter: the reference row for these test sets
     for size in range(1, len(names) + 1):
         out += [("_then_".join(SHORT[n] for n in c), list(c)) for c in permutations(names, size)]
     return out
@@ -132,18 +160,21 @@ def write_markdown(path, summary, splits, settings):
     table = sorted(rows.items(), key=lambda kv: -min(r["accuracy"] for r in kv[1].values()))
     acc_cols = " ".join(f"| {s} accuracy " for s in splits)
     f1_cols = " ".join(f"| {s} macro F1 " for s in splits)
-    header = f"| Rank | Chain | Defences {acc_cols}{f1_cols}| Worst accuracy |"
+    header = f"| Rank | Chain | Defences {acc_cols}{f1_cols}| Mean accuracy | Worst accuracy |"
     lines = ["# Preprocessing defences, alone and chained", "",
              f"Settings: {', '.join(f'{SHORT[n]} {settings[n]}' for n in FIXED)}.",
-             "Sorted by the worst accuracy across the test sets. Chains are applied left to right.",
-             f"Test sets (from data.yaml / config.yaml): {', '.join(splits)}.", "",
-             header, "|---|---|---|" + "---|" * (2 * len(splits) + 1)]
+             "Sorted by the worst accuracy across the test sets. Chains are applied left to right. "
+             f"`{D.NO_DEFENCE}` is the same base model with no filter (the reference row).",
+             f"Test sets (from data.yaml / config.yaml): {', '.join(splits)}. Mean accuracy is the "
+             "image-weighted accuracy over all of them.", "",
+             header, "|---|---|---|" + "---|" * (2 * len(splits) + 2)]
     for rank, (name, r) in enumerate(table, 1):
         accs = [r[s]["accuracy"] for s in splits]
         f1s = [r[s]["f1_macro"] for s in splits]
+        mean = sum(r[s]["accuracy"] * r[s]["n"] for s in splits) / sum(r[s]["n"] for s in splits)
         cells = "".join(f" {a:.4f} |" for a in accs) + "".join(f" {f:.4f} |" for f in f1s)
-        lines.append(f"| {rank} | {name.replace('_then_', ' → ')} | {name.count('_then_') + 1} "
-                     f"|{cells} {min(accs):.4f} |")
+        label = f"**{name}**" if name == D.NO_DEFENCE else name.replace("_then_", " → ")
+        lines.append(f"| {rank} | {label} | {size_of(name)} |{cells} {mean:.4f} | {min(accs):.4f} |")
     # the hand-written analysis below the table is kept when the table is regenerated
     analysis = ""
     if path.exists():
@@ -184,7 +215,8 @@ def main():
 
     T.setup_gpu()
     P2 = load_phase2_test()
-    model = E.load_model(E.phase1_model_path(args, config))
+    model_path = E.phase1_model_path(args, config)
+    model = E.load_model(model_path)
     predictors = [(label, {SHORT[n]: settings[n] for n in steps},
                    D.make_chain_predictor(steps, model, settings)) for label, steps in chains(names)]
 
@@ -194,10 +226,12 @@ def main():
         file_paths = list(ds.file_paths)
         ds = ds.batch(int(config["batch"]))
         for name, params, predict in predictors:
+            key = run_key(params, model_path, Path(config["data"]) / split)
             saved = None if args.rerun else saved_predictions(out / name / split / "predictions.csv",
-                                                              class_names)
+                                                              class_names, key)
             true, probs = saved or predict_split(predict, ds)
             metrics, report = write_reports(P2, out / name / split, true, probs, file_paths, class_names)
+            save_run_key(out / name / split, key)
             summary.append({"defence": name, "setting": params, "test_set": split,
                             "n": metrics["number_of_test_images"],
                             **{m: round(metrics[m], 6) for m in SUMMARY_METRICS}})

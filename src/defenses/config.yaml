@@ -1,6 +1,9 @@
 # Phase 3 settings. Everything not listed here (model, optimizer, aug, epochs...)
 # is read from ../modelling/configs/train.yaml, so the training recipe stays the same.
-data: "../../data/data_updated"   # falls back to <repo>/data/data_updated if missing
+# Clean + PGD + Pixle copies of every train/val image per class (PRD 3.1/3.2), built by
+# src/data_preparation/combine_clean_pgd_pixle.py from data_updated{,_pgd,_pixle}.
+# NOTE: augmentation-based training reads train/ from here too, which now includes attacked copies.
+data: "../../data/data_clean_pgd_pixle"   # falls back to <repo>/data/data_updated if missing
 output_dir: "testing_results"    # all test results land here
 checkpoints_dir: "checkpoints/augmentation"    # trained augmentation-defence checkpoints
 phase1_model: "../../best_robust.keras"    # base classifier at the repo root (resolved from src/defenses/)
@@ -12,14 +15,17 @@ class_names: [10_MPH, 20_MPH, 30_MPH, 40_MPH, 50_MPH, 60_MPH, 70_MPH]
 # Final-eval test sets. The clean entry is overridden with data.yaml's `test` split by config_loader;
 # the attacked sets live here because a YOLO data.yaml only expresses one `test`.
 # Never read by any training or tuning script.
+# test_pgd/test_pixle are the attacked test copies from the same attack run as the attacked val
+# (robust-training branch); data_updated/{pgd,pixle}_attacked are an earlier run of the same attacks.
 test_sets:
   clean: test
-  white_box: pgd_attacked
-  black_box: pixle_attacked
+  white_box: test_pgd
+  black_box: test_pixle
 
 # --- training defences (pixel units, images are 0-255) ---
 gaussian_sigma: 8       # Gaussian augmentation: noise std
 label_smoothing: 0.1    # Label smoothing epsilon
 
-# Preprocessing defence grids are in modules/preprocessing/defences.py (GRIDS);
-# they are not tuned at the moment: test_defences.py tests one fixed setting per defence (FIXED).
+# Preprocessing defence grids are in modules/preprocessing/defences.py (GRIDS) and post-processing
+# grids in modules/post-processing/defences.py. tune_*.py picks one setting per defence on val/;
+# test_*.py then tests every ordered chain of the tuned defences (run_all.sh in each folder).

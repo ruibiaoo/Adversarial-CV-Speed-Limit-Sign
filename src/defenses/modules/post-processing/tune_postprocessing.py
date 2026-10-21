@@ -42,7 +42,7 @@ def obfuscation_score(row):
     return row["confidence_drop"] + row["entropy_increase"]
 
 
-def tune_one(defence, true, base_probs, baseline_f1, tolerance, val):
+def tune_one(defence, true, base_probs, baseline_f1, tolerance, val, file_paths):
     """Sweep defence's grid on the precomputed base val probs; freeze and return the chosen setting."""
     rows = []
     for params in D.GRIDS[defence]:  # mild -> strong
@@ -52,7 +52,8 @@ def tune_one(defence, true, base_probs, baseline_f1, tolerance, val):
         rows.append({**params, "val_accuracy": round(m["accuracy"], 4),
                      "val_macro_f1": round(m["macro_f1"], 4),
                      "confidence_drop": round(obf["confidence_drop"], 4),
-                     "entropy_increase": round(obf["entropy_increase"], 4)})
+                     "entropy_increase": round(obf["entropy_increase"], 4),
+                     **E.per_source_accuracy(file_paths, true, defended)})
         print(f"[{defence}] {params} on {val}: val_macro_f1={m['macro_f1']:.4f} "
               f"conf_drop={obf['confidence_drop']:.4f} entropy+={obf['entropy_increase']:.4f}", flush=True)
 
@@ -93,13 +94,15 @@ def main():
 
     T.setup_gpu()
     model = E.load_model(E.phase1_model_path(args, config))
-    ds = T.load_split(val, config, shuffle=False).batch(int(config["batch"]))
-    true, base_probs = E.predict_split(D.base_classify(model), ds)
+    ds = T.load_split(val, config, shuffle=False)
+    file_paths = list(ds.file_paths)
+    true, base_probs = E.predict_split(D.base_classify(model), ds.batch(int(config["batch"])))
     baseline_f1 = T.metrics(true, base_probs)["macro_f1"]
-    print(f"Baseline (no defence) val macro F1 on '{val}': {baseline_f1:.4f}", flush=True)
+    print(f"Baseline (no defence) val macro F1 on '{val}': {baseline_f1:.4f} "
+          f"{E.per_source_accuracy(file_paths, true, base_probs)}", flush=True)
 
     for defence in names:
-        tune_one(defence, true, base_probs, baseline_f1, args.tolerance, val)
+        tune_one(defence, true, base_probs, baseline_f1, args.tolerance, val, file_paths)
     print(f"Frozen settings written to {TUNED}", flush=True)
 
 

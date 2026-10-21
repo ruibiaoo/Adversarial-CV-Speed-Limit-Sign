@@ -1,0 +1,34 @@
+gaussian_noise:
+  params:
+    scale: 0.2
+  val_accuracy: 0.9879
+  val_macro_f1: 0.9811
+  confidence_drop: 0.2928
+  entropy_increase: 0.8112
+  baseline_val_macro_f1: 0.987
+  tolerance: 0.01
+  selected_on: max output obfuscation with val macro F1 within 0.01 of baseline on
+    'val'
+high_confidence:
+  params:
+    cutoff: 0.1
+  val_accuracy: 0.9955
+  val_macro_f1: 0.987
+  confidence_drop: -0.0059
+  entropy_increase: -0.0315
+  baseline_val_macro_f1: 0.987
+  tolerance: 0.01
+  selected_on: max output obfuscation with val macro F1 within 0.01 of baseline on
+    'val'
+reverse_sigmoid:
+  params:
+    beta: 1.0
+    gamma: 0.5
+  val_accuracy: 0.9939
+  val_macro_f1: 0.9834
+  confidence_drop: 0.8292
+  entropy_increase: 1.8874
+  baseline_val_macro_f1: 0.987
+  tolerance: 0.01
+  selected_on: max output obfuscation with val macro F1 within 0.01 of baseline on
+    'val'

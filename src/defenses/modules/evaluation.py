@@ -47,6 +47,29 @@ def predict_split(predict, ds):
     return true, np.concatenate(probs)
 
 
+SOURCES = ("clean", "pgd", "pixle")  # filename prefixes in data/data_clean_pgd_pixle/{train,val}/
+
+
+def source_of(path):
+    """clean/pgd/pixle from a combined-split filename (src/data_preparation/combine_clean_pgd_pixle.py)."""
+    head = Path(path).name.split("_", 1)[0]
+    return head if head in SOURCES else "clean"
+
+
+def per_source_accuracy(file_paths, true, probs, prefix="val_accuracy"):
+    """{prefix_<source>: accuracy} for each source present, or {} for a single-source split.
+
+    Only logged for reading (what a setting costs on clean vs gains on attacked images);
+    selection still uses the score on the whole split.
+    """
+    src = np.array([source_of(p) for p in file_paths])
+    ok = np.argmax(probs, axis=1) == np.asarray(true)
+    present = [s for s in SOURCES if (src == s).any()]
+    if len(present) < 2:
+        return {}
+    return {f"{prefix}_{s}": round(float(ok[src == s].mean()), 4) for s in present}
+
+
 def parser_for(description, defences, aliases):
     """CLI shared by the test scripts. --defence picks which defences to test."""
     parser = argparse.ArgumentParser(description=description)

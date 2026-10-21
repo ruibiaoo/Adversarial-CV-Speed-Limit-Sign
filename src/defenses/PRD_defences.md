@@ -12,11 +12,11 @@ Make the Phase 1 classifier more robust to the Phase 2 attacks, without using at
 | Post-processing-based (section 4B) | ART transforms of the output probability vector at test time | **Scripts added.** Tuned on val, tested alone and chained. |
 | Augmentation-based (section 5) | New ResNet50 models retrained with an extra training-time augmentation | **To be retrained and tuned on val.** The earlier models were trained on the old data split and have been deleted. |
 
-Base classifier: `best_robust.keras` at the repo root (TF ResNet50, 256 px, trained on `data/data_updated/train/`). The file is gitignored.
+Base classifier: `best_robust.keras` at the repo root (TF ResNet50, 256 px, fine-tuned from the Phase 1 baseline on `data/data_updated/train/` with PGD adversarial training, robust-training branch). The file is gitignored.
 
 ## 2. Data
 
-All splits are in `data/data_updated/`.
+The original splits are in `data/data_updated/` (table below). Since 2026-10-21 the defence scripts read `data/data_clean_pgd_pixle/` instead (section 3.2).
 
 | Split | Images | Used for |
 |---|---|---|
@@ -48,7 +48,23 @@ Only the test scripts read the test folders: `modules/preprocessing/test_defence
 
 ### 3.1 Update (2026-10-17): tuning on an attacked validation split
 
-The split that a run uses for `train`/`val`/`test` is now read from `data/data_updated/data.yaml` (the YOLO spec; see `config_loader.py`). Tuning is allowed to use an **attacked validation split** (an attacked copy of `val/`), set by pointing `val:` in `data.yaml` at that folder. This is a deliberate relaxation of the "attacked copies of val → no tuning" row above: it lets a defence be tuned against an attack while the **attacked test splits (`pgd_attacked/`, `pixle_attacked/`) remain final-eval only**, so the headline test scores are still unbiased. Knowledge leakage still applies in full: no defence setting is ever copied or derived from an attack setting (ε, step size, patch size, queries). `CLAUDE.md` still records the stricter original rule and should be reconciled with this note.
+The split that a run uses for `train`/`val`/`test` is now read from `data/data_updated/data.yaml` (the YOLO spec; see `config_loader.py`). Tuning is allowed to use an **attacked validation split** (an attacked copy of `val/`), set by pointing `val:` in `data.yaml` at that folder. This is a deliberate relaxation of the "attacked copies of val → no tuning" row above: it lets a defence be tuned against an attack while the **attacked test splits (`pgd_attacked/`, `pixle_attacked/`) remain final-eval only**, so the headline test scores are still unbiased. Knowledge leakage still applies in full: no defence setting is ever copied or derived from an attack setting (ε, step size, patch size, queries). `CLAUDE.md` has been reconciled with this note (2026-10-21).
+
+### 3.2 Update (2026-10-21): combined clean + PGD + Pixle tuning split
+
+The robust-training branch generated PGD and Pixle copies of every `train`/`val`/`test` image (`data/data_updated_pgd/`, `data/data_updated_pixle/`, both against `best_baseline.keras`). `src/data_preparation/combine_clean_pgd_pixle.py` merges them into `data/data_clean_pgd_pixle/`, and `config.yaml` now points there:
+
+| Folder | Images | Used for |
+|---|---|---|
+| `train/` | 3 × 1080 (`clean_*`, `pgd_*`, `pixle_*` per class) | Augmentation-based training reads this (now includes attacked copies) |
+| `val/` | 3 × 220 (`clean_*`, `pgd_*`, `pixle_*` per class) | **Tuning** the preprocessing and post-processing defences |
+| `test/` | 115 | Final testing only (clean) |
+| `test_pgd/` | 115 | Final testing only (white-box PGD copy of `test/`, same attack run as the attacked val) |
+| `test_pixle/` | 115 | Final testing only (black-box Pixle copy of `test/`) |
+
+Each defence is tuned alone on the combined `val/` (one setting per defence); the test scripts then run `no_defence` plus every ordered chain of the tuned defences on the three test sets. The tuning logs add per-source val accuracy (`val_accuracy_clean/_pgd/_pixle`) for reading only; selection still uses the whole combined split. `data/data_updated/{pgd,pixle}_attacked/` are an earlier run of the same attacks and are no longer in `test_sets`.
+
+Against `best_robust.keras` the attacks have no effect (97.4% accuracy on `test/`, `test_pgd/` and `test_pixle/` alike; 99.55% on each val source), so the defence results there mostly measure the clean-accuracy cost of each defence. Against the Phase 1 baseline (`src/modelling/runs/tf_resnet50_speed_limit_aug/best/best.keras`) the same test sets give 100% / 0% / 60%.
 
 ## 4. Preprocessing-based defences
 

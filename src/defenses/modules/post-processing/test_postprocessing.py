@@ -14,8 +14,9 @@ on the clean split, which show how much the output is obfuscated.
 The five per-pairing report files are the same as Phase 2 / the preprocessing tester
 (classification_report.txt, test_metrics.txt, confusion_matrix.txt,
 confusion_matrix_normalized.txt, predictions.csv). Results:
-testing_results/post_processing_based/<a>[_then_<b>[_then_<c>]]/<test set>/. A pairing whose
-predictions.csv already exists is not predicted again; --rerun forces it.
+testing_results/post_processing_based/<a>[_then_<b>[_then_<c>]]/<test set>/, plus no_defence/
+(the raw base softmax, as the reference row). A pairing whose predictions.csv already exists is
+not predicted again if its run.json (setting, model, data folder) still matches; --rerun forces it.
 
 Run from src/defenses/:
 
@@ -41,6 +42,7 @@ from modules import evaluation as E  # noqa: E402
 from modules.preprocessing import test_defences as TD  # noqa: E402  (reuse report helpers)
 
 T = E.T
+NO_DEFENCE = "no_defence"
 GROUP = "post_processing_based"
 TUNED = PHASE3 / "modules" / "post-processing" / "tuned_defences.yaml"
 ANALYSIS_HEADING = "## Analysis"
@@ -60,11 +62,21 @@ def frozen_settings(names):
 
 
 def chains(names):
-    """Each single defence, then every ordered chain of 2 and 3 of them (order matters)."""
-    out = []
+    """The no-defence baseline, each single defence, then every ordered chain of 2 and 3 of them
+    (order matters)."""
+    out = [(NO_DEFENCE, [])]  # raw base softmax: the reference row for these test sets
     for size in range(1, len(names) + 1):
         out += [("_then_".join(D.SHORT[n] for n in c), list(c)) for c in permutations(names, size)]
     return out
+
+
+def size_of(name):
+    """Number of defences in a chain label (0 for the no-defence baseline)."""
+    return 0 if name == NO_DEFENCE else name.count("_then_") + 1
+
+
+def label(name):
+    return f"**{name}**" if name == NO_DEFENCE else name.replace("_then_", " → ")
 
 
 def write_markdown(path, summary, splits):
@@ -77,16 +89,18 @@ def write_markdown(path, summary, splits):
     f1_cols = " ".join(f"| {s} macro F1 " for s in splits)
     lines = ["# Post-processing defences, alone and chained", "",
              "Sorted by the worst accuracy across the test sets. Chains are applied left to right on "
-             "the output vector. Settings are tuned on val (tuned_defences.yaml).",
-             f"Test sets (from data.yaml / config.yaml): {', '.join(splits)}.", "",
-             f"| Rank | Chain | Defences {acc_cols}{f1_cols}| Worst accuracy |",
-             "|---|---|---|" + "---|" * (2 * len(splits) + 1)]
+             "the output vector. Settings are tuned on val (tuned_defences.yaml). "
+             f"`{NO_DEFENCE}` is the raw base softmax (the reference row).",
+             f"Test sets (from data.yaml / config.yaml): {', '.join(splits)}. Mean accuracy is the "
+             "image-weighted accuracy over all of them.", "",
+             f"| Rank | Chain | Defences {acc_cols}{f1_cols}| Mean accuracy | Worst accuracy |",
+             "|---|---|---|" + "---|" * (2 * len(splits) + 2)]
     for rank, (name, r) in enumerate(table, 1):
         accs = [r[s]["accuracy"] for s in splits]
         f1s = [r[s]["f1_macro"] for s in splits]
+        mean = sum(r[s]["accuracy"] * r[s]["n"] for s in splits) / sum(r[s]["n"] for s in splits)
         cells = "".join(f" {a:.4f} |" for a in accs) + "".join(f" {f:.4f} |" for f in f1s)
-        lines.append(f"| {rank} | {name.replace('_then_', ' → ')} | {name.count('_then_') + 1} "
-                     f"|{cells} {min(accs):.4f} |")
+        lines.append(f"| {rank} | {label(name)} | {size_of(name)} |{cells} {mean:.4f} | {min(accs):.4f} |")
 
     clean = splits[0]  # the (unattacked) clean split drives the obfuscation view
     lines += ["", f"## Output obfuscation on the clean split ({clean})",
@@ -96,7 +110,7 @@ def write_markdown(path, summary, splits):
               "|---|---|---|---|"]
     for name, r in table:
         c = r[clean]
-        lines.append(f"| {name.replace('_then_', ' → ')} | {c['cross_entropy_loss']:.4f} "
+        lines.append(f"| {label(name)} | {c['cross_entropy_loss']:.4f} "
                      f"| {c['mean_confidence']:.4f} | {c['mean_entropy']:.4f} |")
 
     analysis = ""
@@ -121,9 +135,10 @@ def main():
 
     T.setup_gpu()
     P2 = TD.load_phase2_test()
-    model = E.load_model(E.phase1_model_path(args, config))
-    predictors = [(label, {D.SHORT[n]: settings[n] for n in steps},
-                   D.make_chain_predictor(steps, model, settings)) for label, steps in chains(names)]
+    model_path = E.phase1_model_path(args, config)
+    model = E.load_model(model_path)
+    predictors = [(name, {D.SHORT[n]: settings[n] for n in steps},
+                   D.make_chain_predictor(steps, model, settings)) for name, steps in chains(names)]
 
     summary = []
     splits = list(config["test_sets"].values())
@@ -132,11 +147,13 @@ def main():
         file_paths = list(ds.file_paths)
         ds = ds.batch(int(config["batch"]))
         for name, params, predict in predictors:
+            key = TD.run_key(params, model_path, Path(config["data"]) / split)
             saved = None if args.rerun else TD.saved_predictions(
-                out / name / split / "predictions.csv", class_names)
+                out / name / split / "predictions.csv", class_names, key)
             true, probs = saved or TD.predict_split(predict, ds)
             metrics, report = TD.write_reports(P2, out / name / split, true, probs, file_paths,
                                                class_names)
+            TD.save_run_key(out / name / split, key)
             summary.append({"defence": name, "setting": params, "test_set": split,
                             "n": metrics["number_of_test_images"],
                             **{m: round(metrics[m], 6) for m in SUMMARY_METRICS},

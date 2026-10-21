@@ -37,15 +37,19 @@ ALIASES = {"jpeg": D.JPEG, "median": D.MEDIAN, "gaussian": D.GAUSSIAN}
 def tune_one(defence, model, config):
     """Sweep defence's grid on the val split; freeze and return the best-val-macro-F1 setting."""
     val = config["splits"]["val"]
-    ds = T.load_split(val, config, shuffle=False).batch(int(config["batch"]))
+    ds = T.load_split(val, config, shuffle=False)
+    file_paths = list(ds.file_paths)
+    ds = ds.batch(int(config["batch"]))
     rows = []
     for params in D.GRIDS[defence]:  # mild -> strong
         true, probs = E.predict_split(D.make_predictor(defence, model, params), ds)
         m = T.metrics(true, probs)
+        by_source = E.per_source_accuracy(file_paths, true, probs)
         rows.append({**params, "val_accuracy": round(m["accuracy"], 4),
-                     "val_macro_f1": round(m["macro_f1"], 4), "val_loss": round(m["loss"], 4)})
+                     "val_macro_f1": round(m["macro_f1"], 4), "val_loss": round(m["loss"], 4),
+                     **by_source})
         print(f"[{defence}] {params} on {val}: val_acc={m['accuracy']:.4f} "
-              f"val_macro_f1={m['macro_f1']:.4f}", flush=True)
+              f"val_macro_f1={m['macro_f1']:.4f} {by_source}", flush=True)
 
     T.write_csv(T.PHASE3 / "tuning_logs" / "preprocessing" / defence / "grid.csv", rows)
     best = max(rows, key=lambda r: r["val_macro_f1"])  # first max wins ties -> milder setting
