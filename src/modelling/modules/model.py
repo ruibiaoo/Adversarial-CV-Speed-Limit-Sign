@@ -11,12 +11,13 @@ def _is_true(value, default=False):
     return str(value).lower() in ("1", "true", "yes", "y", "on")
 
 
-def build_model(config, num_classes):
-    """Make a resnet classifier with imagenet weights and a new head."""
-    if _is_true(config.get("robust", False), default=False):
+def _build_base_classifier(config, num_classes, is_robust=False):
+    """Build the ResNet classifier without the ConvAE preprocessor wrapper."""
+    if is_robust:
         from .robustmodel import build_robust_model
 
-        return build_robust_model(config, num_classes)
+        # Attach PGD train_step later so it wraps the outer model if ConvAE is enabled.
+        return build_robust_model(config, num_classes, attach_step=False)
 
     from .robustmodel import _parse_pretrained_setting, load_checkpoint_weights
 
@@ -59,7 +60,9 @@ def build_model(config, num_classes):
     outputs = tf.keras.layers.Dense(
         num_classes,
         activation="softmax",
-        kernel_regularizer=tf.keras.regularizers.l2(weight_decay) if weight_decay > 0 else None,
+        kernel_regularizer=(
+            tf.keras.regularizers.l2(weight_decay) if weight_decay > 0 else None
+        ),
     )(x)
 
     model = tf.keras.Model(inputs, outputs)
@@ -71,6 +74,55 @@ def build_model(config, num_classes):
             freeze_backbone=freeze_backbone,
         )
     return model
+
+
+def build_model(config, num_classes):
+    """Make a ResNet classifier, optionally preceded by a ConvAE preprocessor."""
+    from .convae import (
+        is_wrapped_with_convae,
+        load_convae,
+        parse_convae_config,
+        resolve_convae_path,
+        wrap_with_convae,
+    )
+    from .robustmodel import attach_robust_training
+
+    is_robust = _is_true(config.get("robust", False), default=False)
+    classifier = _build_base_classifier(config, num_classes, is_robust=is_robust)
+
+    convae_cfg = parse_convae_config(config)
+    if convae_cfg["enabled"]:
+        convae_path = convae_cfg["model_path"]
+        if not convae_path:
+            raise ValueError(
+                "convae.enabled is true, but convae.model_path was not specified in config."
+            )
+        if is_wrapped_with_convae(classifier):
+            print(
+                "Warning: classifier already contains a ConvAE preprocessor; skipping duplicate wrap."
+            )
+            final_model = classifier
+        else:
+            resolved_ae = resolve_convae_path(convae_path)
+            image_size = int(config.get("image_size", 256))
+            convae = load_convae(resolved_ae, img_size=image_size)
+            trainable_ae = convae_cfg["trainable"]
+            print(
+                f"ConvAE preprocessing enabled: loaded {resolved_ae} "
+                f"(trainable={trainable_ae})"
+            )
+            final_model = wrap_with_convae(
+                classifier,
+                convae,
+                trainable=trainable_ae,
+            )
+    else:
+        final_model = classifier
+
+    if is_robust:
+        attach_robust_training(final_model, config)
+
+    return final_model
 
 
 def get_optimizer(config):
@@ -111,4 +163,3 @@ def load_classifier(model_path, image_size=256, num_classes=7):
     else:
         model.load_weights(model_path)
     return model
-

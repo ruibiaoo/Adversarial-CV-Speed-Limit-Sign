@@ -20,6 +20,12 @@ pretrained: /app/runs/best_baseline.keras # true (imagenet), false (random init)
 freeze_backbone: false # if true, only train the last layer first
 dropout: 0.4
 
+# ConvAE preprocessing (places a trained ConvAE in front of the ResNet classifier)
+convae:
+  enabled: false
+  model_path: "/app/runs/convae/convae_v1/best.keras" # path to trained ConvAE .keras checkpoint
+  trainable: false # false = freeze pretrained ConvAE (recommended); true = fine-tune jointly with ResNet
+
 # robust training (Equation 3 in arXiv:1906.00945v2, page 4)
 robust: true # toggle true to use RobustModel (PGD adversarial training)
 robust_norm: l2 # l2 (paper default) or linf

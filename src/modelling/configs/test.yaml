@@ -5,6 +5,11 @@ split: "val"
 image_size: 256 # must be same as model thats was trained
 batch: 16
 
+# ConvAE preprocessing (optional purifier placed in front of the ResNet classifier)
+convae:
+  enabled: false
+  model_path: "/app/runs/convae/convae_v1/best.keras"
+
 # Keep this order the same as training
 class_names:
   - 10_MPH

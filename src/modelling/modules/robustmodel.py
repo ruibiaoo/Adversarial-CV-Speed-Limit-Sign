@@ -364,7 +364,33 @@ def make_robust_train_step(
     return train_step
 
 
-def build_robust_model(config: dict, num_classes: int) -> tf.keras.Model:
+def attach_robust_training(model: tf.keras.Model, config: dict) -> tf.keras.Model:
+    """Attach Equation (3) PGD ``train_step`` and helper to ``model``."""
+    robust_params = parse_robust_params(config)
+    print(
+        "Robust training enabled (Equation 3 PGD): "
+        f"norm={robust_params['norm']}, eps={robust_params['eps']:.5g}, "
+        f"step_size={robust_params['step_size']:.5g}, steps={robust_params['steps']}, "
+        f"random_start={robust_params['random_start']}"
+    )
+
+    model.robust_config = robust_params
+    model.generate_adversarial_batch = lambda x_batch, y_batch: generate_pgd_adversarial(
+        model,
+        x_batch,
+        y_batch,
+        **robust_params,
+    )
+    model.train_step = types.MethodType(
+        make_robust_train_step(**robust_params),
+        model,
+    )
+    return model
+
+
+def build_robust_model(
+    config: dict, num_classes: int, attach_step: bool = True
+) -> tf.keras.Model:
     """Build a ResNet classifier from ``modules/resnet50.py`` with PGD robust training.
 
     Keeping the returned object as a standard Keras ``Functional`` model with a
@@ -426,25 +452,8 @@ def build_robust_model(config: dict, num_classes: int) -> tf.keras.Model:
             freeze_backbone=freeze_backbone,
         )
 
-    robust_params = parse_robust_params(config)
-    print(
-        "Robust training enabled (Equation 3 PGD): "
-        f"norm={robust_params['norm']}, eps={robust_params['eps']:.5g}, "
-        f"step_size={robust_params['step_size']:.5g}, steps={robust_params['steps']}, "
-        f"random_start={robust_params['random_start']}"
-    )
-
-    model.robust_config = robust_params
-    model.generate_adversarial_batch = lambda x_batch, y_batch: generate_pgd_adversarial(
-        model,
-        x_batch,
-        y_batch,
-        **robust_params,
-    )
-    model.train_step = types.MethodType(
-        make_robust_train_step(**robust_params),
-        model,
-    )
+    if attach_step:
+        attach_robust_training(model, config)
     return model
 
 

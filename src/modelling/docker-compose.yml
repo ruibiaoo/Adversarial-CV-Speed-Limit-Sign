@@ -16,6 +16,7 @@ services:
       - ../../data/data_updated:/app/data:ro
       - ./:/app
       - ./train.py:/app/train.py:ro
+      - ./train_convae.py:/app/train_convae.py:ro
       - ./test.py:/app/test.py:ro
       - ./gradcam.py:/app/gradcam.py:ro
       - ./run.sh:/app/run.sh:ro
