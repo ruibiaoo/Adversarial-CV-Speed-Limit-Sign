@@ -1,0 +1,20 @@
+{
+  "split": "val",
+  "total_images_seen": 220,
+  "attacked_or_generated_images": 220,
+  "successful_attacks": 182,
+  "attack_success_rate": 0.8272727272727273,
+  "mean_queries": 2360.0639269406392,
+  "mean_l0": 427.10502283105023,
+  "config": {
+    "workers": 8,
+    "restarts": 100,
+    "iterations": 50,
+    "patch_size": 3,
+    "mapping": "random",
+    "algorithm": "restart-iterative",
+    "operation": "overwrite",
+    "seed": 4266,
+    "skip_misclassified": false
+  }
+}
