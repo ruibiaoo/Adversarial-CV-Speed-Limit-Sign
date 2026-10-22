@@ -14,6 +14,7 @@ services:
     volumes:
       # Mount dataset directory from repo root as read-only
       - ../../data/data_updated:/app/data:ro
+      - ../../data/data_pgdpixle:/app/data_pgdpixle:ro
       - ./:/app
       - ./train.py:/app/train.py:ro
       - ./train_convae.py:/app/train_convae.py:ro

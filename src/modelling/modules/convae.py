@@ -31,6 +31,74 @@ def _is_true(value, default: bool = False) -> bool:
     return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
 
 
+# def build_autoencoder(
+#     img_size: int = IMG_SIZE,
+#     channels: int = CHANNELS,
+#     hidden_dim: int = HIDDEN_DIM,
+#     latent_dim: int = LATENT_DIM,
+#     noise_std: float = NOISE_STD,
+#     name: str = "Scaled_Conv_Autoencoder",
+# ) -> tf.keras.Model:
+#     """Build the 5-stage strided convolutional autoencoder."""
+#     img_size = int(img_size)
+#     channels = int(channels)
+#     hidden_dim = int(hidden_dim)
+#     latent_dim = int(latent_dim)
+#     noise_std = float(noise_std)
+
+#     if img_size % 32 != 0:
+#         raise ValueError(
+#             f"img_size must be divisible by 32 for 5 stride-2 stages, got {img_size}"
+#         )
+#     bottleneck_grid = img_size // 32
+#     bottleneck_units = bottleneck_grid * bottleneck_grid * 128
+
+#     # --- ENCODER ---
+#     encoder_input = layers.Input(
+#         shape=(img_size, img_size, channels), name="encoder_input"
+#     )
+
+#     # 5 Strided Conv layers: 256 -> 128 -> 64 -> 32 -> 16 -> 8 (for img_size=256)
+#     x = layers.Conv2D(32, 3, strides=2, padding="same", activation="relu")(
+#         encoder_input
+#     )
+#     x = layers.Conv2D(64, 3, strides=2, padding="same", activation="relu")(x)
+#     x = layers.Conv2D(128, 3, strides=2, padding="same", activation="relu")(x)
+#     x = layers.Conv2D(256, 3, strides=2, padding="same", activation="relu")(x)
+#     x = layers.Conv2D(128, 3, strides=2, padding="same", activation="relu")(x)
+
+#     # Flatten (8 * 8 * 128 = 8192) and compress through Dense layers
+#     x = layers.Flatten()(x)
+#     x = layers.Dense(hidden_dim, activation="relu")(x)
+#     latent = layers.Dense(latent_dim, name="latent_space")(x)
+
+#     # Add Random Gaussian Noise at the bottleneck (active during training)
+#     noisy_latent = layers.GaussianNoise(noise_std)(latent)
+
+#     # --- DECODER ---
+#     # Mirror the Dense layers: 256 -> 1024 -> 8192
+#     x = layers.Dense(hidden_dim, activation="relu")(noisy_latent)
+#     x = layers.Dense(bottleneck_units, activation="relu")(x)
+#     x = layers.Reshape((bottleneck_grid, bottleneck_grid, 128))(x)
+
+#     # 5 Strided Conv2DTranspose layers: 8 -> 16 -> 32 -> 64 -> 128 -> 256
+#     x = layers.Conv2DTranspose(256, 3, strides=2, padding="same", activation="relu")(x)
+#     x = layers.Conv2DTranspose(128, 3, strides=2, padding="same", activation="relu")(x)
+#     x = layers.Conv2DTranspose(64, 3, strides=2, padding="same", activation="relu")(x)
+#     x = layers.Conv2DTranspose(32, 3, strides=2, padding="same", activation="relu")(x)
+
+#     # Final reconstruction layer (Sigmoid keeps pixel values in [0, 1])
+#     decoder_output = layers.Conv2DTranspose(
+#         channels,
+#         3,
+#         strides=2,
+#         padding="same",
+#         activation="sigmoid",
+#         name="reconstructed_output",
+#     )(x)
+
+#     return models.Model(encoder_input, decoder_output, name=name)
+
 def build_autoencoder(
     img_size: int = IMG_SIZE,
     channels: int = CHANNELS,
@@ -39,7 +107,7 @@ def build_autoencoder(
     noise_std: float = NOISE_STD,
     name: str = "Scaled_Conv_Autoencoder",
 ) -> tf.keras.Model:
-    """Build the 5-stage strided convolutional autoencoder."""
+    """Build the 5-stage strided convolutional autoencoder following Waghela et al."""
     img_size = int(img_size)
     channels = int(channels)
     hidden_dim = int(hidden_dim)
@@ -58,34 +126,59 @@ def build_autoencoder(
         shape=(img_size, img_size, channels), name="encoder_input"
     )
 
-    # 5 Strided Conv layers: 256 -> 128 -> 64 -> 32 -> 16 -> 8 (for img_size=256)
-    x = layers.Conv2D(32, 3, strides=2, padding="same", activation="relu")(
+    # Paper uses GELU instead of ReLU to avoid gradient discontinuity at zero,
+    # and applies BatchNormalization after intermediate conv layers.
+    x = layers.Conv2D(32, 3, strides=2, padding="same", activation="gelu")(
         encoder_input
     )
-    x = layers.Conv2D(64, 3, strides=2, padding="same", activation="relu")(x)
-    x = layers.Conv2D(128, 3, strides=2, padding="same", activation="relu")(x)
-    x = layers.Conv2D(256, 3, strides=2, padding="same", activation="relu")(x)
-    x = layers.Conv2D(128, 3, strides=2, padding="same", activation="relu")(x)
+    x = layers.Conv2D(64, 3, strides=2, padding="same")(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("gelu")(x)
 
-    # Flatten (8 * 8 * 128 = 8192) and compress through Dense layers
+    x = layers.Conv2D(128, 3, strides=2, padding="same", activation="gelu")(x)
+    x = layers.Conv2D(256, 3, strides=2, padding="same")(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("gelu")(x)
+
+    x = layers.Conv2D(128, 3, strides=2, padding="same", activation="gelu")(x)
+
+    # # Flatten (8 * 8 * 128 = 8192) and compress through Dense layers
+    # x = layers.Flatten()(x)
+    # x = layers.Dense(hidden_dim, activation="gelu")(x)
+    # latent = layers.Dense(latent_dim, name="latent_space")(x)
+    # Flatten and compress through Dense layers
     x = layers.Flatten()(x)
-    x = layers.Dense(hidden_dim, activation="relu")(x)
-    latent = layers.Dense(latent_dim, name="latent_space")(x)
+    x = layers.Dense(hidden_dim, use_bias=False)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("gelu")(x)
 
-    # Add Random Gaussian Noise at the bottleneck (active during training)
+    # Normalize latent space to unit variance so GaussianNoise cannot be bypassed
+    latent_raw = layers.Dense(latent_dim, use_bias=False)(x)
+    latent = layers.BatchNormalization(scale=False, name="latent_space")(latent_raw)
+
+    # Add Random Gaussian Noise at the bottleneck
     noisy_latent = layers.GaussianNoise(noise_std)(latent)
 
     # --- DECODER ---
     # Mirror the Dense layers: 256 -> 1024 -> 8192
-    x = layers.Dense(hidden_dim, activation="relu")(noisy_latent)
-    x = layers.Dense(bottleneck_units, activation="relu")(x)
+    x = layers.Dense(hidden_dim, activation="gelu")(noisy_latent)
+    x = layers.Dense(bottleneck_units, activation="gelu")(x)
     x = layers.Reshape((bottleneck_grid, bottleneck_grid, 128))(x)
 
-    # 5 Strided Conv2DTranspose layers: 8 -> 16 -> 32 -> 64 -> 128 -> 256
-    x = layers.Conv2DTranspose(256, 3, strides=2, padding="same", activation="relu")(x)
-    x = layers.Conv2DTranspose(128, 3, strides=2, padding="same", activation="relu")(x)
-    x = layers.Conv2DTranspose(64, 3, strides=2, padding="same", activation="relu")(x)
-    x = layers.Conv2DTranspose(32, 3, strides=2, padding="same", activation="relu")(x)
+    # Paper applies BatchNormalization + GELU on the initial Conv2DTranspose stages
+    x = layers.Conv2DTranspose(256, 3, strides=2, padding="same")(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("gelu")(x)
+
+    x = layers.Conv2DTranspose(128, 3, strides=2, padding="same")(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("gelu")(x)
+
+    x = layers.Conv2DTranspose(64, 3, strides=2, padding="same")(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("gelu")(x)
+
+    x = layers.Conv2DTranspose(32, 3, strides=2, padding="same", activation="gelu")(x)
 
     # Final reconstruction layer (Sigmoid keeps pixel values in [0, 1])
     decoder_output = layers.Conv2DTranspose(
@@ -98,7 +191,6 @@ def build_autoencoder(
     )(x)
 
     return models.Model(encoder_input, decoder_output, name=name)
-
 
 def _fixed_affine_1x1(name: str, kernel: np.ndarray, bias: np.ndarray) -> layers.Conv2D:
     """Create a non-trainable 1x1 Conv2D layer with fixed channel transform weights."""
@@ -173,7 +265,7 @@ def resolve_convae_path(raw_path: str | Path) -> Path:
         return candidate
 
     modelling_dir = Path(__file__).resolve().parents[1]
-    repo_dir = modelling_dir.parents[1]
+    repo_dir = modelling_dir.parents[1] if len(modelling_dir.parents) > 1 else modelling_dir
 
     search_candidates = [
         modelling_dir / candidate,

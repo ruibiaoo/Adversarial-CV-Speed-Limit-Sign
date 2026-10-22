@@ -132,10 +132,14 @@ Order is: decode -> resize to `image_size` -> albumentations aug -> resnet `prep
 
 ## ConvAE Preprocessor (Defense)
 
-1. **Train the ConvAE**:
-   - Edit `configs/train_convae.yaml` (set `data`, `project`, `name`, `epochs`, `early_stopping_patience`, `reduce_lr_patience`, etc.).
+1. **Train the ConvAE (Adversarial -> Clean Reconstruction)**:
+   - Edit `configs/train_convae.yaml`:
+     - `data`: clean target dataset root (`/app/data`, mounted from `data/data_updated`).
+     - `adv_data`: list of adversarial dataset roots (`/app/data_pgdpixle`, mounted from `data/data_pgdpixle`). Each `<split>/<class>/NNNN_<stem>.png` is paired 1:1 with `<data>/<split>/<class>/<stem>.<ext>`.
+     - `clean_pair_ratio`: fraction of training pairs that are `clean -> clean` (default `0.5`, so the AE also preserves clean images).
+     - `save_samples`: number of rows in `reconstructions.png` (default `3`, producing a 3x3 grid of `Adversarial Input | Reconstructed | Clean Target`).
    - Run `python -u train_convae.py` (or uncomment it in `run.sh` and run `docker compose up`).
-   - Outputs are saved under `<project>/<name>/`: `best.keras`, `final.keras`, `history.csv`, `metrics.txt`, `config_used.yaml`, and `reconstructions.png`.
+   - Outputs are saved under `<project>/<name>/`: `best.keras`, `final.keras`, `history.csv`, `metrics.txt` (including `identity_baseline_psnr` and `val_clean_psnr`), `config_used.yaml`, and `reconstructions.png`.
 
 2. **Train ResNet with ConvAE preprocessing**:
    - In `configs/train.yaml`, set `pretrained:` to the starting ResNet checkpoint (or `true`/`false`) and configure:
