@@ -12,7 +12,7 @@ workers: 0 # Load data in the training process to reduce RAM usage.
 image_size: 256
 device: 0
 project: "/app/runs"
-name: "tf_resnet50_robust_v2"
+name: "tf_resnet50_convae_v1"
 
 # model, change this to try other backbones
 model_name: resnet50 # resnet50, resnet101
@@ -22,12 +22,12 @@ dropout: 0.4
 
 # ConvAE preprocessing (places a trained ConvAE in front of the ResNet classifier)
 convae:
-  enabled: false
-  model_path: "/app/runs/convae/convae_v1/best.keras" # path to trained ConvAE .keras checkpoint
+  enabled: true
+  model_path: "/app/runs/convae/convae_adv2clean_aug_v6/best.keras" # path to trained ConvAE .keras checkpoint
   trainable: false # false = freeze pretrained ConvAE (recommended); true = fine-tune jointly with ResNet
 
 # robust training (Equation 3 in arXiv:1906.00945v2, page 4)
-robust: true # toggle true to use RobustModel (PGD adversarial training)
+robust: false # toggle true to use RobustModel (PGD adversarial training)
 robust_norm: l2 # l2 (paper default) or linf
 robust_eps: 3.0 # perturbation budget eps in [0, 1] space (e.g. 3.0 for l2, 0.03137 or 8 for linf)
 robust_step_size: 0.5 # PGD step size in [0, 1] space (e.g. 0.5 for l2, 0.00784 or 2 for linf)

@@ -146,24 +146,21 @@ def build_autoencoder(
     # x = layers.Flatten()(x)
     # x = layers.Dense(hidden_dim, activation="gelu")(x)
     # latent = layers.Dense(latent_dim, name="latent_space")(x)
-    # Flatten and compress through Dense layers
-    x = layers.Flatten()(x)
-    x = layers.Dense(hidden_dim, use_bias=False)(x)
+    # Compress through Conv2D bottleneck
+    x = layers.Conv2D(hidden_dim // (bottleneck_grid ** 2), 3, padding="same", use_bias=False)(x)
     x = layers.BatchNormalization()(x)
     x = layers.Activation("gelu")(x)
 
     # Normalize latent space to unit variance so GaussianNoise cannot be bypassed
-    latent_raw = layers.Dense(latent_dim, use_bias=False)(x)
+    latent_raw = layers.Conv2D(latent_dim // (bottleneck_grid ** 2), 1, padding="same", use_bias=False)(x)
     latent = layers.BatchNormalization(scale=False, name="latent_space")(latent_raw)
 
     # Add Random Gaussian Noise at the bottleneck
     noisy_latent = layers.GaussianNoise(noise_std)(latent)
 
     # --- DECODER ---
-    # Mirror the Dense layers: 256 -> 1024 -> 8192
-    x = layers.Dense(hidden_dim, activation="gelu")(noisy_latent)
-    x = layers.Dense(bottleneck_units, activation="gelu")(x)
-    x = layers.Reshape((bottleneck_grid, bottleneck_grid, 128))(x)
+    x = layers.Conv2D(hidden_dim // (bottleneck_grid ** 2), 3, padding="same", activation="gelu")(noisy_latent)
+    x = layers.Conv2D(128, 3, padding="same", activation="gelu")(x)
 
     # Paper applies BatchNormalization + GELU on the initial Conv2DTranspose stages
     x = layers.Conv2DTranspose(256, 3, strides=2, padding="same")(x)
@@ -286,6 +283,21 @@ def resolve_convae_path(raw_path: str | Path) -> Path:
     )
 
 
+def _as_single_io(model: tf.keras.Model) -> tf.keras.Model:
+    """Re-wrap a functional model whose inputs/outputs were deserialized as 1-element lists."""
+    ins, outs = model.inputs, model.outputs
+    if (
+        len(ins) == 1
+        and len(outs) == 1
+        and (
+            isinstance(model.input, (list, tuple))
+            or isinstance(model.output, (list, tuple))
+        )
+    ):
+        return models.Model(ins[0], outs[0], name=model.name)
+    return model
+
+
 def load_convae(
     model_path: str | Path,
     img_size: int = IMG_SIZE,
@@ -296,7 +308,7 @@ def load_convae(
     """Load a trained ConvAE checkpoint, with fallback reconstruction."""
     resolved = resolve_convae_path(model_path)
     try:
-        return tf.keras.models.load_model(str(resolved), compile=False)
+        return _as_single_io(tf.keras.models.load_model(str(resolved), compile=False))
     except Exception:
         pass
 
@@ -378,6 +390,8 @@ def wrap_with_convae(
     x = caffe_to_rgb01_layer()(inputs)
     # When frozen, run the AE in inference mode so GaussianNoise is disabled.
     x = convae(x, training=None if trainable else False)
+    if isinstance(x, (list, tuple)):
+        x = x[0]
     x = rgb01_to_caffe_layer()(x)
     outputs = classifier(x)
 

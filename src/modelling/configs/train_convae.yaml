@@ -3,9 +3,9 @@
 data: "/app/data"            # CLEAN targets (data_updated): <data>/<split>/<class>/<stem>.<ext>
 adv_data:                    # ADVERSARIAL inputs, paired to clean by <class>/NNNN_<stem>.png
   - "/app/data_pgdpixle"
-clean_pair_ratio: 0.25        # Fraction of TRAIN pairs that are clean->clean (0 = adv->clean only)
+clean_pair_ratio: 0.3        # Fraction of TRAIN pairs that are clean->clean (0 = adv->clean only)
 project: "/app/runs/convae"  # Base directory where run outputs are saved
-name: "convae_adv2clean_v3"  # Subfolder inside project: <project>/<name>/
+name: "convae_adv2clean_aug_v6"  # Subfolder inside project: <project>/<name>/
 
 # Training loop settings
 epochs: 300
@@ -18,7 +18,7 @@ save_latest_best: true
 # Architecture (defaults match modules/convae.py)
 hidden_dim: 4096
 latent_dim: 1024
-noise_std: 0.2
+noise_std: 0.1
 input_noise_std: 0.0         # Optional extra Gaussian noise on the INPUT only (train)
 
 # Optimizer & loss
