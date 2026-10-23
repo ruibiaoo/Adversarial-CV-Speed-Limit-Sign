@@ -119,14 +119,18 @@ def train_once(cfg, track):
     early_stopping_patience = int(cfg.get("early_stopping_patience", 5))
     min_learning_rate = float(cfg.get("min_learning_rate", 0.000001))
 
+    checkpoint = tf.keras.callbacks.ModelCheckpoint(
+        str(save_dir / "best.keras"),
+        monitor="val_macro_f1",
+        mode="max",
+        save_best_only=True,
+    )
+    if cfg.get("save_latest_best", False):
+        checkpoint.monitor_op = lambda current, best: current >= best
+
     callbacks = [
         ValidationMacroF1(val_ds),
-        tf.keras.callbacks.ModelCheckpoint(
-            str(save_dir / "best.keras"),
-            monitor="val_macro_f1",
-            mode="max",
-            save_best_only=True,
-        ),
+        checkpoint,
         tf.keras.callbacks.ReduceLROnPlateau(
             monitor="val_macro_f1",
             mode="max",
@@ -157,8 +161,20 @@ def train_once(cfg, track):
 
     val_macro_f1 = history.history.get("val_macro_f1", [0.0])
     best_val = float(max(val_macro_f1)) if val_macro_f1 else 0.0
+    best_checkpoint_path = save_dir / "best.keras"
     print(f"Best validation macro F1: {best_val:.4f}")
-    print(f"Best model saved to: {save_dir / 'best.keras'}")
+    print(f"Best model saved to: {best_checkpoint_path}")
+
+    inner_classifier = getattr(model, "classifier", None)
+    if inner_classifier is not None:
+        if best_checkpoint_path.exists():
+            try:
+                model.load_weights(str(best_checkpoint_path))
+            except Exception:
+                pass
+        classifier_path = save_dir / "best_classifier.keras"
+        inner_classifier.save(str(classifier_path))
+        print(f"Best standalone ResNet classifier saved to: {classifier_path}")
 
     return best_val
 

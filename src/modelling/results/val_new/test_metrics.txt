@@ -1,22 +1,22 @@
 OVERALL TEST METRICS
 ====================
 number_of_test_images: 220
-cross_entropy_loss: 0.022817
+cross_entropy_loss: 0.017591
 accuracy: 0.995455
-balanced_accuracy: 0.996032
+balanced_accuracy: 0.997899
 top_3_accuracy: 1.000000
 top_5_accuracy: 1.000000
-matthews_correlation_coefficient: 0.994424
+matthews_correlation_coefficient: 0.994425
 cohen_kappa: 0.994399
-precision_macro: 0.979592
-recall_macro: 0.996032
-f1_macro: 0.986999
+precision_macro: 0.996139
+recall_macro: 0.997899
+f1_macro: 0.996985
 precision_micro: 0.995455
 recall_micro: 0.995455
 f1_micro: 0.995455
-precision_weighted: 0.996104
+precision_weighted: 0.995577
 recall_weighted: 0.995455
-f1_weighted: 0.995597
+f1_weighted: 0.995469
 roc_auc_macro_ovr: 0.999978
 roc_auc_weighted_ovr: 0.999975
 average_precision_macro: 0.999893
@@ -26,10 +26,10 @@ PER-CLASS METRICS
 =================
 
 10_MPH
-  precision: 0.857143
+  precision: 1.000000
   recall: 1.000000
-  specificity: 0.995327
-  f1: 0.923077
+  specificity: 1.000000
+  f1: 1.000000
   support: 6
 
 20_MPH
@@ -48,9 +48,9 @@ PER-CLASS METRICS
 
 40_MPH
   precision: 1.000000
-  recall: 1.000000
+  recall: 0.985294
   specificity: 1.000000
-  f1: 1.000000
+  f1: 0.992593
   support: 68
 
 50_MPH
@@ -68,8 +68,8 @@ PER-CLASS METRICS
   support: 28
 
 70_MPH
-  precision: 1.000000
-  recall: 0.972222
-  specificity: 1.000000
-  f1: 0.985915
+  precision: 0.972973
+  recall: 1.000000
+  specificity: 0.994565
+  f1: 0.986301
   support: 36

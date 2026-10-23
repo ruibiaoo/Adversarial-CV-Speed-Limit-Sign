@@ -1,0 +1,22 @@
+CONVAE VALIDATION METRICS
+=========================
+best_val_loss: 0.091482
+val_loss: 0.091482
+val_mse: 0.003648
+val_mae: 0.035400
+val_psnr: 27.659653
+val_ssim: 0.897836
+val_clean_ssim: 0.898651
+identity_baseline_mse: 0.001111
+identity_baseline_mae: 0.020957
+identity_baseline_psnr: 30.196724
+val_clean_mse: 0.003672
+val_clean_mae: 0.035154
+val_clean_psnr: 27.709570
+train_total_pairs: 1543
+train_adv_pairs: 1080
+train_clean_pairs: 463
+val_adv_pairs: 220
+val_clean_pairs: 220
+epochs_ran: 212
+best_checkpoint: /app/runs/convae/convae_adv2clean_v5/best.keras

@@ -1,0 +1,5 @@
+adversarial-robustness-toolbox==1.20.1
+pyyaml>=6.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+

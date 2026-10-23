@@ -1,0 +1,30 @@
+services:
+  pgd-attack:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: speed-limit-attack:pgd
+    container_name: pgd_attack_gen
+    environment:
+      PYTHONUNBUFFERED: "1"
+      CUDA_VISIBLE_DEVICES: "0"
+      SPLITS: "train val test"
+      SKIP_MISCLASSIFIED: "false"
+      MAX_IMAGES: ""
+      OVERWRITE: "true"
+    volumes:
+      - ../../../data:/repo/data
+      - ../../../src/modelling/runs:/repo/src/modelling/runs:ro
+      - ./:/repo/src/attack/pgd
+    working_dir: /repo/src/attack/pgd
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    shm_size: '8gb'
+    ipc: host
+    command: [ "bash", "-c", "sed 's/\\r$$//' run.sh | bash" ]
+

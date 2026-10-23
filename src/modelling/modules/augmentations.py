@@ -11,7 +11,7 @@ def _is_true(value, default=True):
     return str(value).lower() in ("1", "true", "yes", "y", "on")
 
 
-def build_augmenter(config, image_size=224):
+def build_augmenter(config, image_size=224, additional_targets=None):
     """Make an albumentations pipeline from the yaml values.
 
     Only used on train split. Val just uses resize + preprocess.
@@ -107,4 +107,4 @@ def build_augmenter(config, image_size=224):
             )
         )
 
-    return A.Compose(transforms)
+    return A.Compose(transforms, additional_targets=additional_targets or {})

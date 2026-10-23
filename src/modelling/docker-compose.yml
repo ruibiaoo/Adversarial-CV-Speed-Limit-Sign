@@ -14,8 +14,10 @@ services:
     volumes:
       # Mount dataset directory from repo root as read-only
       - ../../data/data_updated:/app/data:ro
+      - ../../data/data_pgdpixle:/app/data_pgdpixle:ro
       - ./:/app
       - ./train.py:/app/train.py:ro
+      - ./train_convae.py:/app/train_convae.py:ro
       - ./test.py:/app/test.py:ro
       - ./gradcam.py:/app/gradcam.py:ro
       - ./run.sh:/app/run.sh:ro
@@ -31,6 +33,6 @@ services:
               count: all
               capabilities: [ gpu ]
     # Allocate shared memory for data loading to avoid bus errors
-    shm_size: '8gb'
+    shm_size: '16gb'
     ipc: host
     command: [ "bash", "-c", "sed 's/\\r$$//' run.sh | bash" ]

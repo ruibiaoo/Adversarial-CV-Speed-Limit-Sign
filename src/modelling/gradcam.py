@@ -66,17 +66,67 @@ def resolve_image_path(raw_path, predictions_path):
     raise FileNotFoundError(f"Image not found: {raw_path}")
 
 
+def _has_direct_layer(model_or_layer, layer_name):
+    if not isinstance(model_or_layer, tf.keras.Model):
+        return False
+    try:
+        model_or_layer.get_layer(layer_name)
+        return True
+    except ValueError:
+        return False
+
+
+def _locate_backbone_and_stages(model, target_layer_name=LAST_CONV_LAYER):
+    """Find the ResNet backbone containing ``target_layer_name`` and surrounding layers.
+
+    Supports both standard classifiers (Input -> ResNet -> Dropout -> Dense) and
+    ConvAE-wrapped pipelines (Input -> caffe_to_rgb01 -> ConvAE -> rgb01_to_caffe -> Classifier).
+    """
+    non_input_layers = [
+        l for l in model.layers if not isinstance(l, tf.keras.layers.InputLayer)
+    ]
+
+    # Case 1: ResNet backbone is a direct child of `model`.
+    for idx, layer in enumerate(non_input_layers):
+        if _has_direct_layer(layer, target_layer_name):
+            pre_layers = non_input_layers[:idx]
+            head_layers = non_input_layers[idx + 1 :]
+            return pre_layers, layer, head_layers
+
+    # Case 2: ResNet backbone is nested inside a child classifier model (e.g. wrap_with_convae).
+    for idx, layer in enumerate(non_input_layers):
+        if isinstance(layer, tf.keras.Model):
+            inner_non_input = [
+                l
+                for l in layer.layers
+                if not isinstance(l, tf.keras.layers.InputLayer)
+            ]
+            for inner_idx, inner_layer in enumerate(inner_non_input):
+                if _has_direct_layer(inner_layer, target_layer_name):
+                    pre_layers = (
+                        non_input_layers[:idx] + inner_non_input[:inner_idx]
+                    )
+                    head_layers = (
+                        inner_non_input[inner_idx + 1 :]
+                        + non_input_layers[idx + 1 :]
+                    )
+                    return pre_layers, inner_layer, head_layers
+
+    raise ValueError(
+        f"Expected a nested ResNet backbone containing layer {target_layer_name!r}."
+    )
+
+
 def build_grad_model(model):
     """Return a function image_batch -> (conv_maps, predictions).
 
-    The training script wraps ResNet50 as a nested model, so the conv layer
-    lives inside it and the dropout/dense head must be re-applied by hand.
+    The training script wraps ResNet50 as a nested model (optionally preceded by
+    a ConvAE preprocessor), so the conv layer lives inside the ResNet submodel
+    and any preceding/head layers are applied around it.
     """
-    backbone = next(
-        (l for l in model.layers if isinstance(l, tf.keras.Model)), None
+    pre_layers, backbone, head_layers = _locate_backbone_and_stages(
+        model, LAST_CONV_LAYER
     )
-    if backbone is None:
-        raise ValueError("Expected a nested ResNet backbone in the model.")
 
     backbone_output = backbone.output
     if isinstance(backbone_output, (list, tuple)) and len(backbone_output) == 1:
@@ -86,10 +136,12 @@ def build_grad_model(model):
         backbone.input,
         [backbone.get_layer(LAST_CONV_LAYER).output, backbone_output],
     )
-    head_layers = model.layers[model.layers.index(backbone) + 1:]
 
     def forward(batch):
-        conv_maps, x = backbone_model(batch, training=False)
+        x = batch
+        for layer in pre_layers:
+            x = layer(x, training=False)
+        conv_maps, x = backbone_model(x, training=False)
         if isinstance(x, (list, tuple)) and len(x) == 1:
             x = x[0]
         for layer in head_layers:
