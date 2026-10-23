@@ -13,7 +13,7 @@ services:
       WANDB_ENTITY: hongyaok-hongyaok
     volumes:
       # Mount dataset directory from repo root as read-only
-      - ../../data/data_updated:/app/data:ro
+      - ../../data/data_combined:/app/data:ro
       - ../../data/data_pgdpixle:/app/data_pgdpixle:ro
       - ./:/app
       - ./train.py:/app/train.py:ro

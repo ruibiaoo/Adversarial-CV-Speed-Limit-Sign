@@ -11,8 +11,8 @@ batch: 16
 workers: 0 # Load data in the training process to reduce RAM usage.
 image_size: 256
 device: 0
-project: "/app/runs"
-name: "tf_resnet50_convae_v1"
+project: "/app/runs/adversarial_retraining"
+name: "tf_resnet50_adversarial_retraining"
 
 # model, change this to try other backbones
 model_name: resnet50 # resnet50, resnet101
@@ -22,7 +22,7 @@ dropout: 0.4
 
 # ConvAE preprocessing (places a trained ConvAE in front of the ResNet classifier)
 convae:
-  enabled: true
+  enabled: false
   model_path: "/app/runs/convae/convae_adv2clean_aug_v6/best.keras" # path to trained ConvAE .keras checkpoint
   trainable: false # false = freeze pretrained ConvAE (recommended); true = fine-tune jointly with ResNet
 
