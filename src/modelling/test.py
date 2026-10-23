@@ -1,3 +1,4 @@
+import argparse
 import csv
 from pathlib import Path
 
@@ -348,8 +349,24 @@ def _import_convae_helpers():
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Evaluate a trained speed-limit classifier.")
+    parser.add_argument(
+        "--split",
+        choices=("val", "test", "pgd_attacked", "pixle_attacked"),
+        help="Dataset split to evaluate (defaults to test.yaml).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        help="Directory for this split's reports (defaults to test.yaml).",
+    )
+    args = parser.parse_args()
+
     phase_directory = Path(__file__).resolve().parent
     config = load_config(phase_directory / "configs" / "test.yaml")
+    if args.split is not None:
+        config["split"] = args.split
+    if args.output_dir is not None:
+        config["output_dir"] = args.output_dir
 
     config["model_path"] = resolve_path(
         config["model_path"], phase_directory
