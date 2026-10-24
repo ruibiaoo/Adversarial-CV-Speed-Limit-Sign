@@ -9,16 +9,26 @@ from sklearn.metrics import f1_score
 
 if __package__:
     from .modules.data import build_datasets, compute_class_weights
+    from .modules.grl_model import classification_model
     from .modules.model import build_model, get_optimizer
     from .modules.tuning_config import prepare_sweep
     from .modules.tuning_results import make_output_directory, update_live_results
     from .modules.wandb_config import prepare_wandb_training
 else:
     from modules.data import build_datasets, compute_class_weights
+    from modules.grl_model import classification_model
     from modules.model import build_model, get_optimizer
     from modules.tuning_config import prepare_sweep
     from modules.tuning_results import make_output_directory, update_live_results
     from modules.wandb_config import prepare_wandb_training
+
+
+def _is_true(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
 
 
 def load_config(path):
@@ -45,6 +55,10 @@ class ValidationMacroF1(tf.keras.callbacks.Callback):
 
         for images, labels in self.val_ds:
             predictions = self.model.predict_on_batch(images)
+            if isinstance(labels, dict):
+                labels = labels["class_output"]
+            if isinstance(predictions, dict):
+                predictions = predictions["class_output"]
             predicted = tf.argmax(predictions, axis=1)
             true_labels.extend(labels.numpy())
             predicted_labels.extend(predicted.numpy())
@@ -72,11 +86,17 @@ class WandbLog(tf.keras.callbacks.Callback):
             "epoch": epoch + 1,
             "learning_rate": learning_rate,
             "loss": logs.get("loss"),
-            "accuracy": logs.get("accuracy"),
-            "top5_acc": logs.get("top5_acc"),
+            "accuracy": logs.get("accuracy", logs.get("class_output_accuracy")),
+            "top5_acc": logs.get("top5_acc", logs.get("class_output_top5_acc")),
+            "domain_accuracy": logs.get("domain_output_accuracy"),
             "val_loss": logs.get("val_loss"),
-            "val_accuracy": logs.get("val_accuracy"),
-            "val_top5_acc": logs.get("val_top5_acc"),
+            "val_accuracy": logs.get(
+                "val_accuracy", logs.get("val_class_output_accuracy")
+            ),
+            "val_top5_acc": logs.get(
+                "val_top5_acc", logs.get("val_class_output_top5_acc")
+            ),
+            "val_domain_accuracy": logs.get("val_domain_output_accuracy"),
             "val_macro_f1": logs.get("val_macro_f1"),
         })
 
@@ -100,14 +120,60 @@ def train_once(cfg, track):
 
     model = build_model(cfg, num_classes)
     optimizer = get_optimizer(cfg)
-    model.compile(
-        optimizer=optimizer,
-        loss="sparse_categorical_crossentropy",
-        metrics=[
-            "accuracy",
-            tf.keras.metrics.SparseTopKCategoricalAccuracy(k=5, name="top5_acc"),
-        ],
-    )
+    grl_config = cfg.get("grl", {}) or {}
+    grl_enabled = _is_true(grl_config.get("enabled", False), default=False)
+    fit_kwargs = {"class_weight": class_weights}
+    if grl_enabled:
+        if class_weights is not None:
+            class_weight_values = tf.constant(
+                [class_weights[index] for index in range(num_classes)],
+                dtype=tf.float32,
+            )
+
+            def add_output_sample_weights(images, targets):
+                class_ids = tf.cast(targets["class_output"], tf.int32)
+                class_sample_weights = tf.gather(class_weight_values, class_ids)
+                domain_sample_weights = tf.ones_like(
+                    tf.cast(targets["domain_output"], tf.float32)
+                )
+                return images, targets, {
+                    "class_output": class_sample_weights,
+                    "domain_output": domain_sample_weights,
+                }
+
+            train_ds = train_ds.map(add_output_sample_weights)
+        fit_kwargs = {}
+        model.compile(
+            optimizer=optimizer,
+            loss={
+                "class_output": tf.keras.losses.SparseCategoricalCrossentropy(),
+                "domain_output": tf.keras.losses.SparseCategoricalCrossentropy(),
+            },
+            loss_weights={
+                "class_output": 1.0,
+                "domain_output": float(grl_config.get("domain_loss_weight", 1.0)),
+            },
+            metrics={
+                "class_output": [
+                    tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy"),
+                    tf.keras.metrics.SparseTopKCategoricalAccuracy(
+                        k=min(5, num_classes), name="top5_acc"
+                    ),
+                ],
+                "domain_output": [
+                    tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy")
+                ],
+            },
+        )
+    else:
+        model.compile(
+            optimizer=optimizer,
+            loss="sparse_categorical_crossentropy",
+            metrics=[
+                "accuracy",
+                tf.keras.metrics.SparseTopKCategoricalAccuracy(k=5, name="top5_acc"),
+            ],
+        )
 
     epochs = int(cfg.get("epochs", 50))
     project = cfg.get("project", "/app/runs")
@@ -155,8 +221,8 @@ def train_once(cfg, track):
         validation_data=val_ds,
         epochs=epochs,
         callbacks=callbacks,
-        class_weight=class_weights,
         verbose=1,
+        **fit_kwargs,
     )
 
     val_macro_f1 = history.history.get("val_macro_f1", [0.0])
@@ -165,16 +231,26 @@ def train_once(cfg, track):
     print(f"Best validation macro F1: {best_val:.4f}")
     print(f"Best model saved to: {best_checkpoint_path}")
 
-    inner_classifier = getattr(model, "classifier", None)
-    if inner_classifier is not None:
+    if grl_enabled:
         if best_checkpoint_path.exists():
             try:
                 model.load_weights(str(best_checkpoint_path))
             except Exception:
                 pass
         classifier_path = save_dir / "best_classifier.keras"
-        inner_classifier.save(str(classifier_path))
+        classification_model(model).save(str(classifier_path))
         print(f"Best standalone ResNet classifier saved to: {classifier_path}")
+    else:
+        inner_classifier = getattr(model, "classifier", None)
+        if inner_classifier is not None:
+            if best_checkpoint_path.exists():
+                try:
+                    model.load_weights(str(best_checkpoint_path))
+                except Exception:
+                    pass
+            classifier_path = save_dir / "best_classifier.keras"
+            inner_classifier.save(str(classifier_path))
+            print(f"Best standalone ResNet classifier saved to: {classifier_path}")
 
     return best_val
 

@@ -130,6 +130,29 @@ Ranking uses validation macro F1. Failed trials and missing scores are excluded.
 
 Order is: decode -> resize to `image_size` -> albumentations aug -> resnet `preprocess_input`.
 
+## Gradient-reversal domain-adversarial training (GRL)
+
+The optional GRL model shares a ResNet backbone between two heads: `class_output`
+predicts the speed-limit sign, while `domain_output` predicts clean, PGD, Pixle,
+or PGD+Pixle. The gradient-reversal layer reverses the domain-loss gradient sent
+back into the shared features. The domain head learns to identify the image
+source while the shared representation is trained to make that harder.
+
+To enable it, keep `data` pointed at the combined dataset (the Docker Compose
+file mounts `data/data_combined` there), set `pretrained` to the baseline
+checkpoint, and set `grl.enabled: true` in `configs/train.yaml`. The loader
+derives domain labels from the combined-dataset filename prefixes. The
+`grl.lambda` reversal strength and `grl.domain_loss_weight` are separate
+validation-tuned settings. Do not enable `robust: true` at the same time; the
+custom PGD training step is not integrated with the two-output GRL model.
+
+Training selects the checkpoint by validation macro F1 of the sign-class output.
+It saves the full two-head model as `best.keras` and a sign-classification-only
+model as `best_classifier.keras`. `test.py` can evaluate either checkpoint and
+uses the sign-class output when given the full GRL model. Tune GRL settings on
+the validation split only; reserve the test and attacked test splits for final
+comparison with the baseline.
+
 ## ConvAE Preprocessor (Defense)
 
 1. **Train the ConvAE (Adversarial -> Clean Reconstruction)**:

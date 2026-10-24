@@ -88,7 +88,24 @@ def build_model(config, num_classes):
     from .robustmodel import attach_robust_training
 
     is_robust = _is_true(config.get("robust", False), default=False)
-    classifier = _build_base_classifier(config, num_classes, is_robust=is_robust)
+    grl_config = config.get("grl", {}) or {}
+    grl_enabled = _is_true(grl_config.get("enabled", False), default=False)
+    if grl_enabled and is_robust:
+        raise ValueError(
+            "GRL training and the custom PGD robust train_step are not currently "
+            "supported together. Set robust: false when grl.enabled is true."
+        )
+
+    if grl_enabled:
+        from .grl_model import build_grl_model
+
+        classifier = build_grl_model(
+            config,
+            num_classes,
+            num_domains=int(grl_config.get("num_domains", 4)),
+        )
+    else:
+        classifier = _build_base_classifier(config, num_classes, is_robust=is_robust)
 
     convae_cfg = parse_convae_config(config)
     if convae_cfg["enabled"]:

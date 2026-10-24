@@ -42,6 +42,15 @@ weight_decay: 0.0005 # only used for adamw, and as l2 on last layer
 seed: 4266
 class_weight: balanced # balanced or none, helps when classes are uneven
 
+# Domain-adversarial training (GRL). Enable only when training from data_combined.
+grl:
+  enabled: false
+  lambda: 1.0 # gradient reversal strength; tune using validation data
+  domain_loss_weight: 1.0 # relative weight of domain-classification loss
+  num_domains: 4 # clean, PGD, Pixle, PGD+Pixle
+  domain_hidden_units: 256
+  domain_dropout: 0.4
+
 wandb: # dont change
   project: adversarial-cv-speed-limit-sign
   entity: hongyaok-hongyaok
