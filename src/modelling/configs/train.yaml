@@ -11,12 +11,12 @@ batch: 16
 workers: 0 # Load data in the training process to reduce RAM usage.
 image_size: 256
 device: 0
-project: "/app/runs/adversarial_retraining"
-name: "tf_resnet50_adversarial_retraining"
+project: "/app/runs/grl_adversarial_retraining"
+name: "tf_resnet50_grl_adversarial_retraining"
 
 # model, change this to try other backbones
 model_name: resnet50 # resnet50, resnet101
-pretrained: /app/runs/best_baseline.keras # true (imagenet), false (random init), or path to checkpoint (e.g. "/app/runs/best.keras")
+pretrained: "/app/results/runs/best.keras" # baseline checkpoint mounted from src/modelling/results/runs/best.keras
 freeze_backbone: false # if true, only train the last layer first
 dropout: 0.4
 
@@ -44,7 +44,7 @@ class_weight: balanced # balanced or none, helps when classes are uneven
 
 # Domain-adversarial training (GRL). Enable only when training from data_combined.
 grl:
-  enabled: false
+  enabled: true
   lambda: 1.0 # gradient reversal strength; tune using validation data
   domain_loss_weight: 1.0 # relative weight of domain-classification loss
   num_domains: 4 # clean, PGD, Pixle, PGD+Pixle
