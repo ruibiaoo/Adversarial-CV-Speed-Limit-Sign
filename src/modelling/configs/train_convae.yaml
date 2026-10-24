@@ -1,0 +1,63 @@
+# Hyperparameters for training the Convolutional Autoencoder (ConvAE)
+# Data & output paths
+data: "/app/data"            # CLEAN targets (data_updated): <data>/<split>/<class>/<stem>.<ext>
+adv_data:                    # ADVERSARIAL inputs, paired to clean by <class>/NNNN_<stem>.png
+  - "/app/data_pgdpixle"
+clean_pair_ratio: 0.3        # Fraction of TRAIN pairs that are clean->clean (0 = adv->clean only)
+project: "/app/runs/convae"  # Base directory where run outputs are saved
+name: "convae_adv2clean_aug_v6"  # Subfolder inside project: <project>/<name>/
+
+# Training loop settings
+epochs: 300
+batch: 32
+image_size: 256
+workers: 0
+seed: 4266
+save_latest_best: true
+
+# Architecture (defaults match modules/convae.py)
+hidden_dim: 4096
+latent_dim: 1024
+noise_std: 0.1
+input_noise_std: 0.0         # Optional extra Gaussian noise on the INPUT only (train)
+
+# Optimizer & loss
+optimizer: adam              # adam, adamw, sgd
+learning_rate: 0.001
+momentum: 0.9                # Only used for sgd
+weight_decay: 0.0001         # Only used for adamw
+loss: l1_ssim   # mse or mae or l1_ssim
+ssim_alpha: 0.84
+
+# Convergence / callbacks (monitored on val_loss, mode="min")
+early_stopping_patience: 50
+early_stopping_min_delta: 0.00001
+reduce_lr_patience: 10
+reduce_lr_factor: 0.5
+min_learning_rate: 0.000001
+
+# Diagnostics
+save_samples: 3              # Number of validation rows (each row: Adversarial | Reconstructed | Clean) in reconstructions.png (0 to disable)
+
+# W&B tracking (optional; skipped automatically if WANDB_API_KEY is not set)
+wandb:
+  enabled: true
+  project: adversarial-cv-speed-limit-sign
+  entity: hongyaok-hongyaok
+
+# Optional on-the-fly augmentations on the train split (same keys as train.yaml)
+augment: true
+hsv_h: 0.02
+hsv_s: 0.1
+hsv_v: 0.1
+degrees: 15
+translate: 0.1
+scale: 0.1
+shear: 5
+perspective: 0.0005
+bgr: 0
+grayscale: 0.0
+erasing: 0
+blur_p: 0.1
+blur_limit: [3, 7]
+

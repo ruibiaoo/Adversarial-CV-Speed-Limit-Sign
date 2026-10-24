@@ -5,6 +5,11 @@ split: "pixle_attacked"
 image_size: 256 # must be same as model thats was trained
 batch: 16
 
+# ConvAE preprocessing (optional purifier placed in front of the ResNet classifier)
+convae:
+  enabled: true
+  model_path: "/app/runs/convae/convae_adv2clean_aug_v6/best.keras"
+
 # Keep this order the same as training
 class_names:
   - 10_MPH
@@ -16,4 +21,4 @@ class_names:
   - 70_MPH
 
 # Test reports are saved here
-output_dir: "/app/results/pixle_attacked"
+output_dir: "/app/results/pixle_attacked_convae_v6"

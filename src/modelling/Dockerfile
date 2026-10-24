@@ -21,7 +21,7 @@ COPY src/modelling/requirements.txt ./requirements.txt
 RUN uv pip install --system -r requirements.txt
 
 # Copy source scripts into container
-COPY src/modelling/train.py src/modelling/test.py src/modelling/gradcam.py src/modelling/run.sh ./
+COPY src/modelling/train.py src/modelling/train_convae.py src/modelling/test.py src/modelling/gradcam.py src/modelling/run.sh ./
 COPY src/modelling/modules/ ./modules/
 COPY src/modelling/configs/ ./configs/
 RUN sed -i 's/\r$//' run.sh && chmod +x run.sh

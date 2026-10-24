@@ -11,16 +11,26 @@ def _is_true(value, default=False):
     return str(value).lower() in ("1", "true", "yes", "y", "on")
 
 
-def build_model(config, num_classes):
-    """Make a resnet classifier with imagenet weights and a new head."""
+def _build_base_classifier(config, num_classes, is_robust=False):
+    """Build the ResNet classifier without the ConvAE preprocessor wrapper."""
+    if is_robust:
+        from .robustmodel import build_robust_model
+
+        # Attach PGD train_step later so it wraps the outer model if ConvAE is enabled.
+        return build_robust_model(config, num_classes, attach_step=False)
+
+    from .robustmodel import _parse_pretrained_setting, load_checkpoint_weights
+
     model_name = str(config.get("model_name", "resnet50")).lower()
     image_size = int(config.get("image_size", 224))
     dropout = float(config.get("dropout", 0.2) or 0.0)
-    pretrained = _is_true(config.get("pretrained", True), default=True)
+    pretrained_mode, checkpoint_path = _parse_pretrained_setting(
+        config.get("pretrained", True)
+    )
     freeze_backbone = _is_true(config.get("freeze_backbone", False), default=False)
     weight_decay = float(config.get("weight_decay", 0.0001) or 0.0)
 
-    weights = "imagenet" if pretrained else None
+    weights = "imagenet" if pretrained_mode == "imagenet" else None
     input_shape = (image_size, image_size, 3)
 
     if model_name == "resnet50":
@@ -50,10 +60,69 @@ def build_model(config, num_classes):
     outputs = tf.keras.layers.Dense(
         num_classes,
         activation="softmax",
-        kernel_regularizer=tf.keras.regularizers.l2(weight_decay) if weight_decay > 0 else None,
+        kernel_regularizer=(
+            tf.keras.regularizers.l2(weight_decay) if weight_decay > 0 else None
+        ),
     )(x)
 
-    return tf.keras.Model(inputs, outputs)
+    model = tf.keras.Model(inputs, outputs)
+    if pretrained_mode == "checkpoint" and checkpoint_path is not None:
+        load_checkpoint_weights(
+            model,
+            backbone,
+            checkpoint_path,
+            freeze_backbone=freeze_backbone,
+        )
+    return model
+
+
+def build_model(config, num_classes):
+    """Make a ResNet classifier, optionally preceded by a ConvAE preprocessor."""
+    from .convae import (
+        is_wrapped_with_convae,
+        load_convae,
+        parse_convae_config,
+        resolve_convae_path,
+        wrap_with_convae,
+    )
+    from .robustmodel import attach_robust_training
+
+    is_robust = _is_true(config.get("robust", False), default=False)
+    classifier = _build_base_classifier(config, num_classes, is_robust=is_robust)
+
+    convae_cfg = parse_convae_config(config)
+    if convae_cfg["enabled"]:
+        convae_path = convae_cfg["model_path"]
+        if not convae_path:
+            raise ValueError(
+                "convae.enabled is true, but convae.model_path was not specified in config."
+            )
+        if is_wrapped_with_convae(classifier):
+            print(
+                "Warning: classifier already contains a ConvAE preprocessor; skipping duplicate wrap."
+            )
+            final_model = classifier
+        else:
+            resolved_ae = resolve_convae_path(convae_path)
+            image_size = int(config.get("image_size", 256))
+            convae = load_convae(resolved_ae, img_size=image_size)
+            trainable_ae = convae_cfg["trainable"]
+            print(
+                f"ConvAE preprocessing enabled: loaded {resolved_ae} "
+                f"(trainable={trainable_ae})"
+            )
+            final_model = wrap_with_convae(
+                classifier,
+                convae,
+                trainable=trainable_ae,
+            )
+    else:
+        final_model = classifier
+
+    if is_robust:
+        attach_robust_training(final_model, config)
+
+    return final_model
 
 
 def get_optimizer(config):
@@ -94,4 +163,3 @@ def load_classifier(model_path, image_size=256, num_classes=7):
     else:
         model.load_weights(model_path)
     return model
-

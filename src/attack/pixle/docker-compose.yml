@@ -1,0 +1,29 @@
+services:
+  pixle-attack:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: speed-limit-attack:pixle
+    container_name: pixle_attack_gen
+    environment:
+      PYTHONUNBUFFERED: "1"
+      CUDA_VISIBLE_DEVICES: "0"
+      SPLITS: "train val test"
+      SKIP_MISCLASSIFIED: "false"
+      WORKERS: "8"
+      MAX_IMAGES: ""
+    volumes:
+      - ../../../data:/repo/data
+      - ../../../src/modelling/runs:/repo/src/modelling/runs:ro
+      - ./:/repo/src/attack/pixle
+    working_dir: /repo
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    shm_size: '8gb'
+    ipc: host
+    command: [ "bash", "-c", "sed 's/\\r$$//' src/attack/pixle/run.sh | bash" ]

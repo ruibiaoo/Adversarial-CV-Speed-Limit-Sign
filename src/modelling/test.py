@@ -309,6 +309,44 @@ def load_classifier(model_path, image_size=256, num_classes=7):
     return model
 
 
+def _import_convae_helpers():
+    if __package__:
+        from .modules.convae import (
+            is_wrapped_with_convae,
+            load_convae,
+            parse_convae_config,
+            resolve_convae_path,
+            wrap_with_convae,
+        )
+    else:
+        try:
+            from modules.convae import (
+                is_wrapped_with_convae,
+                load_convae,
+                parse_convae_config,
+                resolve_convae_path,
+                wrap_with_convae,
+            )
+        except ModuleNotFoundError:
+            import sys
+
+            sys.path.append(str(Path(__file__).resolve().parent))
+            from modules.convae import (
+                is_wrapped_with_convae,
+                load_convae,
+                parse_convae_config,
+                resolve_convae_path,
+                wrap_with_convae,
+            )
+    return (
+        is_wrapped_with_convae,
+        load_convae,
+        parse_convae_config,
+        resolve_convae_path,
+        wrap_with_convae,
+    )
+
+
 def main():
     phase_directory = Path(__file__).resolve().parent
     config = load_config(phase_directory / "configs" / "test.yaml")
@@ -327,6 +365,35 @@ def main():
     image_size = int(config["image_size"])
     num_classes = len(config["class_names"])
     model = load_classifier(model_path, image_size=image_size, num_classes=num_classes)
+
+    (
+        is_wrapped_with_convae,
+        load_convae,
+        parse_convae_config,
+        resolve_convae_path,
+        wrap_with_convae,
+    ) = _import_convae_helpers()
+    convae_cfg = parse_convae_config(config)
+    convae_used_path = None
+    if convae_cfg["enabled"]:
+        if is_wrapped_with_convae(model):
+            print(
+                f"Note: {model_path} already contains a ConvAE preprocessor; "
+                "using its embedded ConvAE without wrapping a second time."
+            )
+            convae_used_path = f"embedded ({model_path})"
+        else:
+            raw_ae_path = convae_cfg["model_path"]
+            if not raw_ae_path:
+                raise ValueError(
+                    "convae.enabled is true in test.yaml, but convae.model_path is not set."
+                )
+            resolved_ae = resolve_convae_path(resolve_path(raw_ae_path, phase_directory))
+            convae = load_convae(resolved_ae, img_size=image_size)
+            model = wrap_with_convae(model, convae, trainable=False)
+            convae_used_path = str(resolved_ae)
+            print(f"ConvAE preprocessing enabled for evaluation: {resolved_ae}")
+
     input_height = model.input_shape[1]
     input_width = model.input_shape[2]
     if input_height != image_size or input_width != image_size:
@@ -349,6 +416,8 @@ def main():
         probabilities,
         class_names,
     )
+    if convae_used_path is not None:
+        metrics = {"convae_preprocessor": convae_used_path, **metrics}
 
     row_totals = matrix.sum(axis=1, keepdims=True)
     normalized_matrix = np.divide(
@@ -399,6 +468,8 @@ def main():
 
     print("\n--- TEST RESULTS ---")
     print(f"Model: {model_path}")
+    if convae_used_path is not None:
+        print(f"ConvAE preprocessor: {convae_used_path}")
     print(f"Test images: {metrics['number_of_test_images']}")
     print(f"Accuracy: {metrics['accuracy']:.4f}")
     print(f"Balanced accuracy: {metrics['balanced_accuracy']:.4f}")

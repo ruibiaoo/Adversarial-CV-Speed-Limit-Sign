@@ -4,12 +4,20 @@ experiment:
   output_dir: src/attack/pgd/results
 
 model:
-  path: src/modelling/runs/best.keras
+  path: src/modelling/runs/best_baseline.keras
   image_size: 256
   from_logits: false
 
+generation:
+  splits:
+    - train
+    - val
+    - test
+  skip_misclassified: false
+  output_root: data/data_pgdpixle
+
 data:
-  root: data/data_updated
+  root: data/data_updated_pixle
   batch_size: 32
   class_names:
     - 10_MPH
