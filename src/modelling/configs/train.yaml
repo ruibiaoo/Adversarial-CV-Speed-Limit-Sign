@@ -16,7 +16,7 @@ name: "tf_resnet50_grl_adversarial_retraining"
 
 # model, change this to try other backbones
 model_name: resnet50 # resnet50, resnet101
-pretrained: "/app/results/runs/best.keras" # baseline checkpoint mounted from src/modelling/results/runs/best.keras
+pretrained: "/app/results/runs/best_baseline.keras" # baseline checkpoint mounted from src/modelling/results/runs/best.keras
 freeze_backbone: false # if true, only train the last layer first
 dropout: 0.4
 
