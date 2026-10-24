@@ -1,5 +1,5 @@
 # Model and test data
-model_path: "/app/runs/grl_adversarial_retraining/best.keras"
+model_path: "/app/runs/grl_adversarial_retraining/grl.keras"
 data: "/app/eval_data"
 split: "test"
 image_size: 256 # must be same as model thats was trained

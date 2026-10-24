@@ -179,6 +179,7 @@ def train_once(cfg, track):
     project = cfg.get("project", "/app/runs")
     save_dir = Path(project)
     save_dir.mkdir(parents=True, exist_ok=True)
+    best_checkpoint_path = save_dir / ("grl.keras" if grl_enabled else "best.keras")
 
     reduce_lr_factor = float(cfg.get("reduce_lr_factor", 0.5))
     reduce_lr_patience = int(cfg.get("reduce_lr_patience", 2))
@@ -186,7 +187,7 @@ def train_once(cfg, track):
     min_learning_rate = float(cfg.get("min_learning_rate", 0.000001))
 
     checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        str(save_dir / "best.keras"),
+        str(best_checkpoint_path),
         monitor="val_macro_f1",
         mode="max",
         save_best_only=True,
@@ -227,7 +228,6 @@ def train_once(cfg, track):
 
     val_macro_f1 = history.history.get("val_macro_f1", [0.0])
     best_val = float(max(val_macro_f1)) if val_macro_f1 else 0.0
-    best_checkpoint_path = save_dir / "best.keras"
     print(f"Best validation macro F1: {best_val:.4f}")
     print(f"Best model saved to: {best_checkpoint_path}")
 
