@@ -26,6 +26,8 @@ services:
       - ./configs:/app/configs:ro
       - ./results:/app/results
       - ./runs:/app/runs
+      # Phase 3 test-time defences, read by test.py when enabled in test.yaml
+      - ../defenses/modules:/defenses/modules:ro
     deploy:
       resources:
         reservations:

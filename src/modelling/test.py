@@ -39,8 +39,12 @@ def resolve_path(value, base_directory):
     return base_directory / path
 
 
-def build_test_dataset(config):
-    """Load the test split without shuffling or augmentation."""
+def build_test_dataset(config, apply_preprocess=True):
+    """Load the test split without shuffling or augmentation.
+
+    apply_preprocess=False keeps raw 0-255 images (used when test-time defences are on,
+    because they filter the image before preprocess_input).
+    """
     image_size = int(config["image_size"])
     batch = int(config["batch"])
     class_names = list(config["class_names"])
@@ -61,7 +65,8 @@ def build_test_dataset(config):
         image = preprocess_input(tf.cast(image, tf.float32))
         return image, label
 
-    dataset = dataset.map(preprocess, num_parallel_calls=1)
+    if apply_preprocess:
+        dataset = dataset.map(preprocess, num_parallel_calls=1)
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
     return dataset, file_paths
 
@@ -360,6 +365,20 @@ def _import_convae_helpers():
     )
 
 
+def _import_defence_helpers():
+    if __package__:
+        from .modules import test_time_defences
+    else:
+        try:
+            from modules import test_time_defences
+        except ModuleNotFoundError:
+            import sys
+
+            sys.path.append(str(Path(__file__).resolve().parent))
+            from modules import test_time_defences
+    return test_time_defences
+
+
 def main():
     parser = argparse.ArgumentParser(description="Evaluate a trained speed-limit classifier.")
     parser.add_argument(
@@ -390,6 +409,11 @@ def main():
     model_path = Path(config["model_path"])
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}")
+
+    # optional test-time defences (preprocessing/postprocessing blocks in test.yaml);
+    # parsed before the model loads so config mistakes fail fast
+    defences = _import_defence_helpers()
+    pre_steps, pre_params, post_steps, post_params = defences.parse_defences(config)
 
     image_size = int(config["image_size"])
     num_classes = len(config["class_names"])
@@ -431,28 +455,112 @@ def main():
             f"but test.yaml uses {image_size}x{image_size}."
         )
 
-    test_ds, file_paths = build_test_dataset(config)
-    true_labels = np.concatenate(
-        [labels.numpy() for _, labels in test_ds]
-    )
-    predictions = model.predict(test_ds, verbose=1)
-    if isinstance(predictions, dict):
-        probabilities = predictions["class_output"]
-    elif isinstance(predictions, (tuple, list)):
-        probabilities = predictions[0]
-    else:
-        probabilities = predictions
-    predicted_labels = np.argmax(probabilities, axis=1)
-
     class_names = list(config["class_names"])
+    convae_metric = {}
+    if convae_used_path is not None:
+        convae_metric["convae_preprocessor"] = convae_used_path
+    defences_dir = resolve_path(
+        config.get("defences_dir", "../defenses/modules"), phase_directory
+    )
+
+    # permutations: true in a block -> test every order of its chain, one folder per run
+    pre_permute, post_permute = defences.permutation_flags(config)
+    if pre_permute or post_permute:
+        test_ds, file_paths = build_test_dataset(config, apply_preprocess=False)
+
+        def save_run(run_directory, true_labels, probabilities, extra_metrics):
+            return write_reports(
+                run_directory,
+                true_labels,
+                probabilities,
+                file_paths,
+                class_names,
+                {**convae_metric, **extra_metrics},
+            )
+
+        defences.run_permutations(
+            model,
+            defences_dir,
+            (pre_steps, pre_params, pre_permute),
+            (post_steps, post_params, post_permute),
+            test_ds,
+            output_directory,
+            save_run,
+            title=f"Model: `{model_path}`. Split: `{config['split']}`."
+            + (f" ConvAE: `{convae_used_path}`." if convae_used_path else ""),
+        )
+        return
+
+    pre_used = defences.describe(pre_steps, pre_params) if pre_steps else None
+    post_used = defences.describe(post_steps, post_params) if post_steps else None
+    if pre_used or post_used:
+        print(f"Preprocessing defences: {pre_used or 'off'}")
+        print(f"Postprocessing defences: {post_used or 'off'}")
+        predict = defences.build_predictor(
+            model, defences_dir, pre_steps, pre_params, post_steps, post_params
+        )
+        test_ds, file_paths = build_test_dataset(config, apply_preprocess=False)
+        true_labels, probabilities = defences.predict_dataset(predict, test_ds)
+    else:
+        test_ds, file_paths = build_test_dataset(config)
+        true_labels = np.concatenate(
+            [labels.numpy() for _, labels in test_ds]
+        )
+        predictions = model.predict(test_ds, verbose=1)
+        if isinstance(predictions, dict):
+            probabilities = predictions["class_output"]
+        elif isinstance(predictions, (tuple, list)):
+            probabilities = predictions[0]
+        else:
+            probabilities = predictions
+
+    extra_metrics = dict(convae_metric)
+    if pre_used is not None:
+        extra_metrics["preprocessing_defences"] = pre_used
+    if post_used is not None:
+        extra_metrics["postprocessing_defences"] = post_used
+    metrics = write_reports(
+        output_directory,
+        true_labels,
+        probabilities,
+        file_paths,
+        class_names,
+        extra_metrics,
+    )
+
+    print("\n--- TEST RESULTS ---")
+    print(f"Model: {model_path}")
+    if convae_used_path is not None:
+        print(f"ConvAE preprocessor: {convae_used_path}")
+    if pre_used is not None:
+        print(f"Preprocessing defences: {pre_used}")
+    if post_used is not None:
+        print(f"Postprocessing defences: {post_used}")
+    print(f"Test images: {metrics['number_of_test_images']}")
+    print(f"Accuracy: {metrics['accuracy']:.4f}")
+    print(f"Balanced accuracy: {metrics['balanced_accuracy']:.4f}")
+    print(f"Macro F1: {metrics['f1_macro']:.4f}")
+    print(f"Results saved to: {output_directory}")
+
+
+def write_reports(
+    output_directory,
+    true_labels,
+    probabilities,
+    file_paths,
+    class_names,
+    extra_metrics=None,
+):
+    """Save the five report files of one run. extra_metrics go at the top of test_metrics.txt."""
+    output_directory.mkdir(parents=True, exist_ok=True)
+    predicted_labels = np.argmax(probabilities, axis=1)
     metrics, per_class, matrix = calculate_metrics(
         true_labels,
         predicted_labels,
         probabilities,
         class_names,
     )
-    if convae_used_path is not None:
-        metrics = {"convae_preprocessor": convae_used_path, **metrics}
+    metrics = {**(extra_metrics or {}), **metrics}
 
     row_totals = matrix.sum(axis=1, keepdims=True)
     normalized_matrix = np.divide(
@@ -500,16 +608,7 @@ def main():
         probabilities,
         class_names,
     )
-
-    print("\n--- TEST RESULTS ---")
-    print(f"Model: {model_path}")
-    if convae_used_path is not None:
-        print(f"ConvAE preprocessor: {convae_used_path}")
-    print(f"Test images: {metrics['number_of_test_images']}")
-    print(f"Accuracy: {metrics['accuracy']:.4f}")
-    print(f"Balanced accuracy: {metrics['balanced_accuracy']:.4f}")
-    print(f"Macro F1: {metrics['f1_macro']:.4f}")
-    print(f"Results saved to: {output_directory}")
+    return metrics
 
 
 if __name__ == "__main__":

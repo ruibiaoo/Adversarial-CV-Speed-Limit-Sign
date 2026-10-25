@@ -10,6 +10,28 @@ convae:
   enabled: false
   model_path: "/app/runs/convae/convae_adv2clean_aug_v6/best.keras"
 
+# Test-time defences 
+# Code: ../defenses/modules/preprocessing/defences.py and ../defenses/modules/post-processing/defences.py
+# Order: image -> preprocessing chain -> model (incl. ConvAE above) -> postprocessing chain.
+# Settings below are the val-tuned values (tuned_defences.yaml in those folders).
+# permutations: true -> test no defence, each defence alone, then every possible order within the chain
+#   (both blocks true = every pre order x every post order). Results: output_dir/<run>/ + summary.md
+defences_dir: "../defenses/modules"
+preprocessing:
+  enabled: false
+  permutations: false
+  chain: # runs top to bottom, each defence at most once
+    - jpeg: { quality: 90 }
+    - median: { kernel: 7 }
+    # - gaussian: { sigma: 4, samples: 32, seed: 4266 }   # randomized smoothing, ~32x slower
+postprocessing:
+  enabled: false
+  permutations: false
+  chain:
+    - revsig: { beta: 1.0, gamma: 0.5 }
+    # - noise: { scale: 0.2 }
+    # - highconf: { cutoff: 0.1 }
+
 # Keep this order the same as training
 class_names:
   - 10_MPH

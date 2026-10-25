@@ -239,3 +239,6 @@ src/defenses/.cuda_cache/
 
 # Built from data_updated{,_pgd,_pixle} by src/data_preparation/combine_clean_pgd_pixle.py
 data/data_clean_pgd_pixle/
+
+# Local notes (not committed)
+*.local.md

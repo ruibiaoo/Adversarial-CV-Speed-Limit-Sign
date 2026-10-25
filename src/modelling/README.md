@@ -79,6 +79,33 @@ Testing is separate from training so the held-out test set is used only when you
 
 `test_metrics.txt` contains loss, top-1/3/5 accuracy, balanced accuracy, macro/micro/weighted precision, recall and F1, Matthews correlation coefficient, Cohen's kappa, ROC AUC, average precision, and per-class precision, recall, specificity, F1 and support. `predictions.csv` contains every image's true class, predicted class, confidence, and all class probabilities.
 
+### Test-time defences (optional)
+
+`test.yaml` can wrap the model in the Phase 3 test-time defences, for any `model_path` (baseline, robust, ConvAE-wrapped):
+
+```yaml
+preprocessing:          # filters the image before the model
+  enabled: true
+  chain:                # runs top to bottom, each defence at most once
+    - jpeg: { quality: 90 }
+    - median: { kernel: 7 }
+    # - gaussian: { sigma: 4, samples: 32, seed: 4266 }
+postprocessing:         # changes the output probabilities after the model
+  enabled: true
+  chain:
+    - revsig: { beta: 1.0, gamma: 0.5 }
+    # - noise: { scale: 0.2 }
+    # - highconf: { cutoff: 0.1 }
+```
+
+- Order: image → preprocessing chain → model (with ConvAE if `convae.enabled`) → postprocessing chain.
+- `permutations: true` in a block tests every order of its chain, the same set as the `src/defenses` test scripts: no defence, each defence alone, then every order of 2, 3, … of them. With both blocks set to `true`, every pre order is paired with every post order (3 + 3 defences = 16 × 16 = 256 runs; the model runs only 16 times). Each run gets its own folder `output_dir/<pre>__<post>/`, and `output_dir/summary.md` ranks them all.
+- With both blocks set to `enabled: false`, `test.py` runs exactly as before.
+- The defences used are written at the top of `test_metrics.txt`. Give each run its own `output_dir`.
+- The defence code is read from `src/defenses/modules/` (`defences_dir` in `test.yaml`). In Docker, `docker-compose.yml` mounts it at `/defenses/modules`.
+- Post-processing needs ART (`adversarial-robustness-toolbox` in `requirements.txt`), so rebuild the image once with `docker compose build`.
+- `gradcam.py` still explains the undefended model.
+
 Set `tuner: false` in `tuner.yaml` for one normal training run.
 Set `tuner: true` to run a W&B sweep instead.
 Lower `iterations` first for a smoke test.
