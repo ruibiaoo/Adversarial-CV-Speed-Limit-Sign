@@ -1,0 +1,7 @@
+defence,setting,epochs_trained,best_epoch,train_loss_at_best,val_loss_at_best,min_val_loss,min_val_loss_epoch,val_accuracy,val_macro_f1,chosen
+random_erasing,max_area=0.1,22,17,0.0645,0.0213,0.0213,17,0.9961,0.998,yes
+random_erasing,max_area=0.2,15,10,0.4058,0.0875,0.064,5,0.9883,0.9755,
+random_erasing,max_area=0.3,24,19,0.0877,0.0159,0.0159,19,0.9961,0.9912,
+mixup,alpha=0.1,13,8,0.3269,0.0303,0.0303,8,1.0,1.0,yes
+mixup,alpha=0.2,14,9,0.4052,0.1014,0.0897,14,0.9767,0.968,
+mixup,alpha=0.4,20,15,0.5724,0.0849,0.0717,9,0.9922,0.9958,

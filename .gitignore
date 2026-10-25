@@ -229,8 +229,16 @@ tuning/detect/
 
 # Model checkpoints and runs (exceeds GitHub 100MB limit)
 src/Phase_1/runs/
+src/defenses/checkpoints/
 *.keras
 
 # Weights & Biases
 src/Phase_1/wandb/
 wandb/
+src/defenses/.cuda_cache/
+
+# Built from data_updated{,_pgd,_pixle} by src/data_preparation/combine_clean_pgd_pixle.py
+data/data_clean_pgd_pixle/
+
+# Local notes (not committed)
+*.local.md

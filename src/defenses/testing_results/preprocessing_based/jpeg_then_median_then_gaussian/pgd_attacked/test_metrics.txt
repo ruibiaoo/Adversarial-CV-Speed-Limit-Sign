@@ -1,0 +1,75 @@
+OVERALL TEST METRICS
+====================
+number_of_test_images: 115
+cross_entropy_loss: 4.095713
+accuracy: 0.869565
+balanced_accuracy: 0.890494
+top_3_accuracy: 0.913043
+top_5_accuracy: 1.000000
+matthews_correlation_coefficient: 0.840618
+cohen_kappa: 0.840070
+precision_macro: 0.889042
+recall_macro: 0.890494
+f1_macro: 0.888097
+precision_micro: 0.869565
+recall_micro: 0.869565
+f1_micro: 0.869565
+precision_weighted: 0.871977
+recall_weighted: 0.869565
+f1_weighted: 0.869181
+roc_auc_macro_ovr: 0.939111
+roc_auc_weighted_ovr: 0.926873
+average_precision_macro: 0.837165
+average_precision_weighted: 0.807863
+
+PER-CLASS METRICS
+=================
+
+10_MPH
+  precision: 1.000000
+  recall: 1.000000
+  specificity: 1.000000
+  f1: 1.000000
+  support: 3
+
+20_MPH
+  precision: 0.923077
+  recall: 1.000000
+  specificity: 0.990291
+  f1: 0.960000
+  support: 12
+
+30_MPH
+  precision: 0.857143
+  recall: 0.900000
+  specificity: 0.968421
+  f1: 0.878049
+  support: 20
+
+40_MPH
+  precision: 0.878788
+  recall: 0.828571
+  specificity: 0.950000
+  f1: 0.852941
+  support: 35
+
+50_MPH
+  precision: 0.714286
+  recall: 0.714286
+  specificity: 0.960396
+  f1: 0.714286
+  support: 14
+
+60_MPH
+  precision: 1.000000
+  recall: 0.846154
+  specificity: 1.000000
+  f1: 0.916667
+  support: 13
+
+70_MPH
+  precision: 0.850000
+  recall: 0.944444
+  specificity: 0.969072
+  f1: 0.894737
+  support: 18

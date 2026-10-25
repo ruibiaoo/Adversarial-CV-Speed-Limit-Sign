@@ -1,0 +1,14 @@
+random_erasing:
+  params:
+    max_area: 0.1
+  checkpoint: checkpoints/augmentation/random_erasing_max_area0.1/best.keras
+  val_accuracy: 0.9961
+  val_macro_f1: 0.998
+  selected_on: clean val macro F1
+mixup:
+  params:
+    alpha: 0.1
+  checkpoint: checkpoints/augmentation/mixup_alpha0.1/best.keras
+  val_accuracy: 1.0
+  val_macro_f1: 1.0
+  selected_on: clean val macro F1
