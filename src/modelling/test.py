@@ -1,3 +1,4 @@
+import argparse
 import csv
 from pathlib import Path
 
@@ -277,6 +278,18 @@ def save_predictions(
 
 def load_classifier(model_path, image_size=256, num_classes=7):
     """Load model, falling back to architecture reconstruction for Keras 2/3 cross-compatibility."""
+    # Import registers the custom GRL layer before deserializing a full GRL model.
+    if __package__:
+        from .modules.gradient_reversal import GradientReversal  # noqa: F401
+    else:
+        try:
+            from modules.gradient_reversal import GradientReversal  # noqa: F401
+        except ModuleNotFoundError:
+            import sys
+
+            sys.path.append(str(Path(__file__).resolve().parent))
+            from modules.gradient_reversal import GradientReversal  # noqa: F401
+
     try:
         return tf.keras.models.load_model(model_path, compile=False)
     except Exception:
@@ -348,8 +361,24 @@ def _import_convae_helpers():
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Evaluate a trained speed-limit classifier.")
+    parser.add_argument(
+        "--split",
+        choices=("val", "test", "pgd_attacked", "pixle_attacked"),
+        help="Dataset split to evaluate (defaults to test.yaml).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        help="Directory for this split's reports (defaults to test.yaml).",
+    )
+    args = parser.parse_args()
+
     phase_directory = Path(__file__).resolve().parent
     config = load_config(phase_directory / "configs" / "test.yaml")
+    if args.split is not None:
+        config["split"] = args.split
+    if args.output_dir is not None:
+        config["output_dir"] = args.output_dir
 
     config["model_path"] = resolve_path(
         config["model_path"], phase_directory
@@ -406,7 +435,13 @@ def main():
     true_labels = np.concatenate(
         [labels.numpy() for _, labels in test_ds]
     )
-    probabilities = model.predict(test_ds, verbose=1)
+    predictions = model.predict(test_ds, verbose=1)
+    if isinstance(predictions, dict):
+        probabilities = predictions["class_output"]
+    elif isinstance(predictions, (tuple, list)):
+        probabilities = predictions[0]
+    else:
+        probabilities = predictions
     predicted_labels = np.argmax(probabilities, axis=1)
 
     class_names = list(config["class_names"])
