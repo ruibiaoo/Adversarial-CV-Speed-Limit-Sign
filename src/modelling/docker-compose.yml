@@ -16,18 +16,22 @@ services:
       - ../../data/data_combined:/app/data:ro
       - ../../data/data_pgdpixle:/app/data_pgdpixle:ro
       - ../../data/data_updated:/app/eval_data:ro
+      - ../../data/data_updated_pgd:/app/data_updated_pgd:ro
+      - ../../data/data_updated_pixle:/app/data_updated_pixle:ro
       - ./:/app
       - ./train.py:/app/train.py:ro
       - ./train_convae.py:/app/train_convae.py:ro
       - ./test.py:/app/test.py:ro
+      - ./test_all.py:/app/test_all.py:ro
       - ./gradcam.py:/app/gradcam.py:ro
       - ./run.sh:/app/run.sh:ro
       - ./modules:/app/modules:ro
       - ./configs:/app/configs:ro
       - ./results:/app/results
       - ./runs:/app/runs
-      # Phase 3 test-time defences, read by test.py when enabled in test.yaml
+      # Phase 3 test-time defences, read by test.py and test_all.py
       - ../defenses/modules:/defenses/modules:ro
+      - ../defenses/modules:/app/defenses/modules:ro
     deploy:
       resources:
         reservations:

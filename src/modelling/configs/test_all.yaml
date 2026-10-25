@@ -1,0 +1,99 @@
+# Configuration for testing all combinations of preprocessing + model + postprocessing
+# Run inside Docker via `docker compose up` (with `python -u test_all.py` in run.sh)
+# or locally via `python src/modelling/test_all.py --config src/modelling/configs/test_all.yaml`
+
+# Main output directory:
+#   - <output_dir>/tests/<combo_folder>/config.txt
+#   - <output_dir>/tests/<combo_folder>/<dataset_name>/{confusion_matrix.txt, confusion_matrix_normalized.txt, test_metrics.txt, classification_report.txt, predictions.csv}
+#   - <output_dir>/<metric>.txt (one table per metric across all combinations & datasets)
+#   - <output_dir>/runtime.txt (runtime metrics across num_runs)
+output_dir: "/app/results/test_all"
+
+# Number of times to run inference for each (preprocessing, model, postprocessing) combination
+# to compute total and average runtime.
+num_runs: 10
+
+# Fixed random seed reset before every run so results are identical across runs
+seed: 4266
+
+# Image & batch settings (must match model input resolution)
+image_size: 256
+batch: 16
+
+# Path to Phase 3 test-time defence modules
+defences_dir: "../defenses/modules"
+
+# Class names in training index order
+class_names:
+  - 10_MPH
+  - 20_MPH
+  - 30_MPH
+  - 40_MPH
+  - 50_MPH
+  - 60_MPH
+  - 70_MPH
+
+# Dictionary mapping model string names -> model checkpoint paths
+models:
+  baseline: "/app/runs/best_baseline.keras"
+  adversarial_retrained: "/app/runs/best_adversarial_retrained.keras"
+  robust: "/app/runs/best_robust.keras"
+  grl: "/app/runs/grl.keras"
+  convae_rn50: "/app/runs/best_convae_rn50.keras"
+
+# Dictionary mapping dataset string names -> dataset split paths (each containing class folders)
+datasets:
+  # val: "/app/eval_data/val"
+  clean_test: "/app/eval_data/test"
+  pgd_test: "/app/eval_data/pgd_attacked"
+  pixle_test: "/app/eval_data/pixle_attacked"
+  pgdpixle_test: "/app/data_pgdpixle/test"
+
+# Preprocessing defences
+# Supported defences:
+#   - jpeg:     { quality: 90 }
+#   - median:   { kernel: 7 }
+#   - gaussian: { sigma: 4, samples: 32, seed: 4266 }
+#   - convae:   { model_path: "/app/runs/convae_adv2clean_aug_v6.keras" }
+#
+# Supported modes:
+#   - "permutations": tests all ordered chains of length 1..N (plus "none" if include_none: true)
+#   - "combinations": tests all subsets of length 1..N in listed order (plus "none" if include_none: true)
+#   - "explicit":     tests only the chains listed under `chains` (plus "none" if include_none: true)
+preprocessing:
+  enabled: true
+  include_none: true
+  skip_duplicate_convae: true  # Skip chains with `convae` if the model already has an embedded ConvAE
+  mode: "permutations"         # "permutations", "combinations", or "explicit"
+  defences:
+    jpeg: { quality: 90 }
+    median: { kernel: 7 }
+    gaussian: { sigma: 4, samples: 32, seed: 4266 }
+    convae: { model_path: "/app/runs/convae_adv2clean_aug_v6.keras" }
+  chains:                      # Only used when mode: "explicit"
+    - []
+    - [jpeg]
+    - [median]
+    - [jpeg, median]
+
+# Postprocessing defences
+# Supported defences:
+#   - revsig:   { beta: 1.0, gamma: 0.5 }
+#   - noise:    { scale: 0.2 }
+#   - highconf: { cutoff: 0.1 }
+#
+# Supported modes: "permutations", "combinations", or "explicit"
+postprocessing:
+  enabled: true
+  include_none: true
+  mode: "permutations"         # "permutations", "combinations", or "explicit"
+  defences:
+    revsig: { beta: 1.0, gamma: 0.5 }
+    noise: { scale: 0.2 }
+    highconf: { cutoff: 0.1 }
+  chains:                      # Only used when mode: "explicit"
+    - []
+    - [revsig]
+    - [noise]
+    - [highconf]
+
