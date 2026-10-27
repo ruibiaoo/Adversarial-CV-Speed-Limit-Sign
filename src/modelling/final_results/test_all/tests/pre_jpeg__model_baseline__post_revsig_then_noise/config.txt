@@ -1,0 +1,20 @@
+TEST CONFIGURATION
+==================
+Preprocessing: jpeg
+Preprocessing Details: jpeg_compression(quality=90)
+Model: baseline
+Model Path: /app/runs/best_baseline.keras
+Postprocessing: revsig -> noise
+Postprocessing Details: reverse_sigmoid(beta=1.0, gamma=0.5) -> gaussian_noise(scale=0.2)
+Datasets: clean_test, pgd_test, pixle_test, pgdpixle_test
+Seed: 4266
+Number of Runs: 10
+
+RUNTIME SUMMARY
+===============
+Total Runtime (s): 26.293055
+Average Runtime per Run (s): 2.629306
+Total Runs: 10
+Total Inferences per Run: 460
+Average Time per Inference (s): 0.005716
+Average Time per Inference (ms): 5.7159

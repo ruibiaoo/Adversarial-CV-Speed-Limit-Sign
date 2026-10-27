@@ -8,6 +8,7 @@ from pathlib import Path
 import random
 import re
 import sys
+import threading
 import time
 
 import numpy as np
@@ -401,26 +402,35 @@ def build_combined_predictor(
 ):
     """Build fn(batch_images_0_255) -> probabilities for any (pre_steps, model, post_steps) combination."""
     wrapped_model = ttd._ClassOutput(model)
+    model_lock = threading.Lock()
+
+    def classify_caffe(caffe_input: np.ndarray) -> np.ndarray:
+        with model_lock:
+            return np.asarray(wrapped_model.predict_on_batch(caffe_input))
 
     def classify(images_0_255: np.ndarray) -> np.ndarray:
         caffe_input = preprocess_input(np.array(images_0_255, dtype=np.float32))
-        return np.asarray(wrapped_model.predict_on_batch(caffe_input))
+        return classify_caffe(caffe_input)
 
-    def apply_deterministic_step(images: np.ndarray, step_name: str) -> np.ndarray:
+    def apply_deterministic_step(images: np.ndarray, step_name: str, workers: int = 1) -> np.ndarray:
         if step_name == CONVAE_STEP:
             if convae_model is None:
                 raise RuntimeError("ConvAE step requested in preprocessing chain, but convae_model was not loaded.")
             x_01 = np.clip(np.asarray(images, dtype=np.float32) / 255.0, 0.0, 1.0)
-            rec_01 = np.clip(np.asarray(convae_model.predict_on_batch(x_01)), 0.0, 1.0)
-            return rec_01 * 255.0
+            with model_lock:
+                rec_01 = np.asarray(convae_model.predict_on_batch(x_01))
+            return np.clip(rec_01, 0.0, 1.0) * 255.0
         transform = pre_module.transform_for(step_name, pre_params[step_name])
         uint8_imgs = pre_module._to_uint8(images)
+        if workers > 1 and len(uint8_imgs) > 1:
+            executor = pre_module._get_executor(workers)
+            return np.stack(list(executor.map(transform, uint8_imgs)))
         return np.stack([transform(im) for im in uint8_imgs])
 
-    def apply_deterministic_chain(images: np.ndarray, step_names: list[str]) -> np.ndarray:
+    def apply_deterministic_chain(images: np.ndarray, step_names: list[str], workers: int = 1) -> np.ndarray:
         out = images
         for s in step_names:
-            out = apply_deterministic_step(out, s)
+            out = apply_deterministic_step(out, s, workers=workers)
         return out
 
     gaussian_name = "gaussian_smoothing"
@@ -435,15 +445,50 @@ def build_combined_predictor(
         sigma = float(pre_params[gaussian_name]["sigma"])
         n = int(pre_params[gaussian_name].get("samples", pre_module.SMOOTHING_SAMPLES))
         g_seed = int(pre_params[gaussian_name].get("seed", seed))
+        workers = max(
+            1,
+            int(pre_params[gaussian_name].get("workers", getattr(pre_module, "SMOOTHING_WORKERS", 8))),
+        )
 
         def pre_predict(images: np.ndarray) -> np.ndarray:
             rng = np.random.default_rng(g_seed)
+            starts = list(range(0, len(images), 2))
+            if not starts:
+                return np.zeros((0, 0), dtype=np.float32)
+
+            chunk_rngs = pre_module._spawn_rngs(rng, len(starts))
+
+            if len(starts) == 1 or workers <= 1:
+                counts = []
+                for start, chunk_rng in zip(starts, chunk_rngs):
+                    batch = apply_deterministic_chain(images[start : start + 2], before, workers=workers)
+                    noisy = pre_module.gaussian_noise(
+                        np.repeat(batch, n, axis=0), sigma, chunk_rng, workers=workers
+                    )
+                    ready = apply_deterministic_chain(noisy, after, workers=workers)
+                    scores = classify(ready)
+                    pred = np.argmax(scores, axis=1).reshape(len(batch), n)
+                    counts += [np.bincount(p, minlength=scores.shape[1]) for p in pred]
+                return np.stack(counts).astype(np.float32) / float(n)
+
+            executor = pre_module._get_executor(workers)
+
+            def prepare_chunk(start: int, chunk_rng) -> tuple[int, np.ndarray]:
+                batch = apply_deterministic_chain(images[start : start + 2], before, workers=1)
+                noisy = pre_module._gaussian_noise_slice(np.repeat(batch, n, axis=0), sigma, chunk_rng)
+                ready = apply_deterministic_chain(noisy, after, workers=1)
+                caffe_input = preprocess_input(np.array(ready, dtype=np.float32))
+                return len(batch), caffe_input
+
+            futures = [
+                executor.submit(prepare_chunk, start, chunk_rng)
+                for start, chunk_rng in zip(starts, chunk_rngs)
+            ]
             counts = []
-            for start in range(0, len(images), 2):
-                batch = apply_deterministic_chain(images[start : start + 2], before)
-                noisy = pre_module.gaussian_noise(np.repeat(batch, n, axis=0), sigma, rng)
-                scores = classify(apply_deterministic_chain(noisy, after))
-                pred = np.argmax(scores, axis=1).reshape(len(batch), n)
+            for fut in futures:
+                batch_len, caffe_input = fut.result()
+                scores = classify_caffe(caffe_input)
+                pred = np.argmax(scores, axis=1).reshape(batch_len, n)
                 counts += [np.bincount(p, minlength=scores.shape[1]) for p in pred]
             return np.stack(counts).astype(np.float32) / float(n)
 
@@ -469,6 +514,7 @@ def write_config_txt(
     dataset_names: list[str],
     seed: int,
     num_runs: int,
+    warmup_runs: int,
     runtime_stats: dict,
 ) -> None:
     """Write config.txt inside a combination's folder under <output_dir>/tests/<combo>/."""
@@ -483,6 +529,7 @@ def write_config_txt(
         f"Postprocessing Details: {post_details}",
         f"Datasets: {', '.join(dataset_names)}",
         f"Seed: {seed}",
+        f"Warmup Runs: {warmup_runs}",
         f"Number of Runs: {num_runs}",
         "",
         "RUNTIME SUMMARY",
@@ -623,6 +670,10 @@ def main():
     if num_runs < 1:
         raise ValueError(f"num_runs must be >= 1, got {num_runs}")
 
+    warmup_runs = int(config.get("warmup_runs", 1))
+    if warmup_runs < 0:
+        raise ValueError(f"warmup_runs must be >= 0, got {warmup_runs}")
+
     seed = int(config.get("seed", 4266))
     image_size = int(config.get("image_size", 256))
     batch_size = int(config.get("batch", 16))
@@ -683,6 +734,7 @@ def main():
         f"  Datasets ({len(dataset_names)}): {', '.join(dataset_names)} ({inferences_per_run} total images/run)\n"
         f"  Preprocessing chains ({len(pre_chains)}): {', '.join(chain_display_name(c) for c in pre_chains)}\n"
         f"  Postprocessing chains ({len(post_chains)}): {', '.join(chain_display_name(c) for c in post_chains)}\n"
+        f"  Warmup runs per model: {warmup_runs}\n"
         f"  Runs per combination: {num_runs} (seed={seed})\n"
         f"  Main output directory: {output_dir}\n",
         flush=True,
@@ -714,14 +766,19 @@ def main():
             convae_model = load_convae(convae_resolved_path, img_size=image_size)
             convae_model.trainable = False
 
-        # Warm up the loaded model on one batch so TF graph compilation does not skew the first combination's timing
+        # Warm up the loaded model (and ConvAE) for `warmup_runs` passes so TF graph compilation
+        # and cuDNN autotuning do not skew the first combination's timing
         first_ds = next(iter(loaded_datasets.values()))
-        if first_ds["batches"]:
-            warmup_batch = preprocess_input(np.array(first_ds["batches"][0][:2], dtype=np.float32))
-            _ = ttd._ClassOutput(model).predict_on_batch(warmup_batch)
-            if convae_model is not None:
-                warmup_01 = np.clip(np.asarray(first_ds["batches"][0][:2], dtype=np.float32) / 255.0, 0.0, 1.0)
-                _ = convae_model.predict_on_batch(warmup_01)
+        if warmup_runs > 0 and first_ds["batches"]:
+            print(f"Running {warmup_runs} warmup pass(es) for model '{model_name}' ...", flush=True)
+            warmup_raw = np.asarray(first_ds["batches"][0], dtype=np.float32)
+            warmup_batch = preprocess_input(warmup_raw.copy())
+            warmup_clf = ttd._ClassOutput(model)
+            warmup_01 = np.clip(warmup_raw / 255.0, 0.0, 1.0) if convae_model is not None else None
+            for _ in range(warmup_runs):
+                _ = warmup_clf.predict_on_batch(warmup_batch)
+                if convae_model is not None:
+                    _ = convae_model.predict_on_batch(warmup_01)
 
         for pre_chain in pre_chains:
             if CONVAE_STEP in pre_chain and model_has_embedded_convae and skip_duplicate_convae:
@@ -823,6 +880,7 @@ def main():
                     dataset_names=dataset_names,
                     seed=seed,
                     num_runs=num_runs,
+                    warmup_runs=warmup_runs,
                     runtime_stats=runtime_stats,
                 )
 
@@ -842,6 +900,7 @@ def main():
                         "postprocessing_details": post_details,
                         "dataset": ds_name,
                         "seed": seed,
+                        "warmup_runs": warmup_runs,
                         "num_runs": num_runs,
                         "dataset_total_runtime_s": ds_total_rt,
                         "dataset_avg_runtime_s": ds_avg_rt,

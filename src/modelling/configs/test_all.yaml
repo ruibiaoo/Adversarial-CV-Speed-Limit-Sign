@@ -7,11 +7,12 @@
 #   - <output_dir>/tests/<combo_folder>/<dataset_name>/{confusion_matrix.txt, confusion_matrix_normalized.txt, test_metrics.txt, classification_report.txt, predictions.csv}
 #   - <output_dir>/<metric>.txt (one table per metric across all combinations & datasets)
 #   - <output_dir>/runtime.txt (runtime metrics across num_runs)
-output_dir: "/app/results/test_all"
+output_dir: "/app/final_final_results_i_promise"
 
 # Number of times to run inference for each (preprocessing, model, postprocessing) combination
 # to compute total and average runtime.
-num_runs: 10
+num_runs: 3
+warmup_runs: 5
 
 # Fixed random seed reset before every run so results are identical across runs
 seed: 4266
@@ -64,7 +65,7 @@ preprocessing:
   enabled: true
   include_none: true
   skip_duplicate_convae: true  # Skip chains with `convae` if the model already has an embedded ConvAE
-  mode: "permutations"         # "permutations", "combinations", or "explicit"
+  mode: "explicit"         # "permutations", "combinations", or "explicit"
   defences:
     jpeg: { quality: 90 }
     median: { kernel: 7 }
@@ -72,9 +73,10 @@ preprocessing:
     convae: { model_path: "/app/runs/convae_adv2clean_aug_v6.keras" }
   chains:                      # Only used when mode: "explicit"
     - []
-    - [jpeg]
-    - [median]
-    - [jpeg, median]
+    - [convae, jpeg]
+    - [jpeg, median, gaussian]
+    - [jpeg, median, gaussian]
+    - [convae, jpeg, median, gaussian]
 
 # Postprocessing defences
 # Supported defences:
