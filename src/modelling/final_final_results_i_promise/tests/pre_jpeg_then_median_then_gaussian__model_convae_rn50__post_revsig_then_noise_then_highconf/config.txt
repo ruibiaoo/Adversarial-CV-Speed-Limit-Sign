@@ -1,0 +1,21 @@
+TEST CONFIGURATION
+==================
+Preprocessing: jpeg -> median -> gaussian
+Preprocessing Details: jpeg_compression(quality=90) -> median_smoothing(kernel=7) -> gaussian_smoothing(sigma=4, samples=32, seed=4266)
+Model: convae_rn50
+Model Path: /app/runs/best_convae_rn50.keras
+Postprocessing: revsig -> noise -> highconf
+Postprocessing Details: reverse_sigmoid(beta=1.0, gamma=0.5) -> gaussian_noise(scale=0.2) -> high_confidence(cutoff=0.1)
+Datasets: clean_test, pgd_test, pixle_test, pgdpixle_test
+Seed: 4266
+Warmup Runs: 5
+Number of Runs: 3
+
+RUNTIME SUMMARY
+===============
+Total Runtime (s): 253.747606
+Average Runtime per Run (s): 84.582535
+Total Runs: 3
+Total Inferences per Run: 460
+Average Time per Inference (s): 0.183875
+Average Time per Inference (ms): 183.8751

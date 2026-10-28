@@ -1,0 +1,20 @@
+TEST CONFIGURATION
+==================
+Preprocessing: median
+Preprocessing Details: median_smoothing(kernel=7)
+Model: baseline
+Model Path: /app/runs/best_baseline.keras
+Postprocessing: revsig -> highconf
+Postprocessing Details: reverse_sigmoid(beta=1.0, gamma=0.5) -> high_confidence(cutoff=0.1)
+Datasets: clean_test, pgd_test, pixle_test, pgdpixle_test
+Seed: 4266
+Number of Runs: 10
+
+RUNTIME SUMMARY
+===============
+Total Runtime (s): 66.005896
+Average Runtime per Run (s): 6.600590
+Total Runs: 10
+Total Inferences per Run: 460
+Average Time per Inference (s): 0.014349
+Average Time per Inference (ms): 14.3491

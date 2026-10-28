@@ -1,0 +1,20 @@
+TEST CONFIGURATION
+==================
+Preprocessing: none
+Preprocessing Details: none
+Model: baseline
+Model Path: /app/runs/best_baseline.keras
+Postprocessing: none
+Postprocessing Details: none
+Datasets: clean_test, pgd_test, pixle_test, pgdpixle_test
+Seed: 4266
+Number of Runs: 10
+
+RUNTIME SUMMARY
+===============
+Total Runtime (s): 26.903564
+Average Runtime per Run (s): 2.690356
+Total Runs: 10
+Total Inferences per Run: 460
+Average Time per Inference (s): 0.005849
+Average Time per Inference (ms): 5.8486

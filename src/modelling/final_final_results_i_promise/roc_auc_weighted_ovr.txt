@@ -1,0 +1,292 @@
+Metric: roc_auc_weighted_ovr
+
+Preprocessing                         Model                  Postprocessing               clean_test  pgd_test  pixle_test  pgdpixle_test
+------------------------------------  ---------------------  ---------------------------  ----------  --------  ----------  -------------
+none                                  baseline               none                           1.000000  0.380221    0.955452       0.371409
+none                                  baseline               revsig                         0.965887  0.392081    0.851033       0.383377
+none                                  baseline               noise                          1.000000  0.407006    0.901477       0.409146
+none                                  baseline               highconf                       1.000000  0.415504    0.956115       0.421455
+none                                  baseline               revsig -> noise                0.528136  0.489569    0.531054       0.488771
+none                                  baseline               revsig -> highconf             0.965887  0.392081    0.851033       0.383377
+none                                  baseline               noise -> revsig                0.963442  0.426983    0.540001       0.434936
+none                                  baseline               noise -> highconf              1.000000  0.407281    0.902903       0.406302
+none                                  baseline               highconf -> revsig             0.980318  0.415504    0.375399       0.420161
+none                                  baseline               highconf -> noise              1.000000  0.407209    0.906066       0.409439
+none                                  baseline               revsig -> noise -> highconf    0.508136  0.485463    0.518621       0.485452
+none                                  baseline               revsig -> highconf -> noise    0.528136  0.489569    0.531054       0.488771
+none                                  baseline               noise -> revsig -> highconf    0.962646  0.426907    0.540001       0.434936
+none                                  baseline               noise -> highconf -> revsig    0.927729  0.433756    0.415177       0.450873
+none                                  baseline               highconf -> revsig -> noise    0.519882  0.490133    0.491671       0.488780
+none                                  baseline               highconf -> noise -> revsig    0.991306  0.427131    0.844008       0.434563
+convae -> jpeg                        baseline               none                           1.000000  0.999891    1.000000       1.000000
+convae -> jpeg                        baseline               revsig                         0.962489  0.949019    0.964017       0.939862
+convae -> jpeg                        baseline               noise                          0.996108  0.986865    0.996108       0.987790
+convae -> jpeg                        baseline               highconf                       1.000000  0.999891    1.000000       1.000000
+convae -> jpeg                        baseline               revsig -> noise                0.525697  0.530196    0.525509       0.530325
+convae -> jpeg                        baseline               revsig -> highconf             0.962489  0.949019    0.964017       0.939862
+convae -> jpeg                        baseline               noise -> revsig                0.964448  0.955952    0.965862       0.957148
+convae -> jpeg                        baseline               noise -> highconf              0.996449  0.984734    0.996449       0.986366
+convae -> jpeg                        baseline               highconf -> revsig             0.967516  0.948716    0.975894       0.953165
+convae -> jpeg                        baseline               highconf -> noise              0.996535  0.987137    0.996861       0.987579
+convae -> jpeg                        baseline               revsig -> noise -> highconf    0.508679  0.514747    0.508527       0.510965
+convae -> jpeg                        baseline               revsig -> highconf -> noise    0.525697  0.530196    0.525509       0.530325
+convae -> jpeg                        baseline               noise -> revsig -> highconf    0.963853  0.955140    0.965375       0.956553
+convae -> jpeg                        baseline               noise -> highconf -> revsig    0.935367  0.927498    0.935513       0.931435
+convae -> jpeg                        baseline               highconf -> revsig -> noise    0.522005  0.525797    0.522994       0.524206
+convae -> jpeg                        baseline               highconf -> noise -> revsig    0.983394  0.979351    0.983791       0.973310
+jpeg -> median -> gaussian            baseline               none                           1.000000  0.919006    1.000000       0.938846
+jpeg -> median -> gaussian            baseline               revsig                         1.000000  0.893472    1.000000       0.904194
+jpeg -> median -> gaussian            baseline               noise                          1.000000  0.903860    1.000000       0.921786
+jpeg -> median -> gaussian            baseline               highconf                       1.000000  0.920547    1.000000       0.925340
+jpeg -> median -> gaussian            baseline               revsig -> noise                0.518032  0.512659    0.518032       0.510143
+jpeg -> median -> gaussian            baseline               revsig -> highconf             1.000000  0.893472    1.000000       0.904194
+jpeg -> median -> gaussian            baseline               noise -> revsig                0.976119  0.905752    0.976119       0.909707
+jpeg -> median -> gaussian            baseline               noise -> highconf              1.000000  0.905666    1.000000       0.922734
+jpeg -> median -> gaussian            baseline               highconf -> revsig             1.000000  0.893185    1.000000       0.904108
+jpeg -> median -> gaussian            baseline               highconf -> noise              1.000000  0.904022    1.000000       0.919485
+jpeg -> median -> gaussian            baseline               revsig -> noise -> highconf    0.506733  0.506604    0.506733       0.501460
+jpeg -> median -> gaussian            baseline               revsig -> highconf -> noise    0.518032  0.512659    0.518032       0.510143
+jpeg -> median -> gaussian            baseline               noise -> revsig -> highconf    0.975632  0.904745    0.975632       0.908900
+jpeg -> median -> gaussian            baseline               noise -> highconf -> revsig    0.949764  0.881763    0.949764       0.883457
+jpeg -> median -> gaussian            baseline               highconf -> revsig -> noise    0.518032  0.512302    0.518032       0.512512
+jpeg -> median -> gaussian            baseline               highconf -> noise -> revsig    0.978182  0.930211    0.978182       0.896176
+convae -> jpeg -> median -> gaussian  baseline               none                           1.000000  0.989895    1.000000       0.989895
+convae -> jpeg -> median -> gaussian  baseline               revsig                         0.990099  0.969187    0.990099       0.989937
+convae -> jpeg -> median -> gaussian  baseline               noise                          0.993386  0.978647    0.993386       0.985793
+convae -> jpeg -> median -> gaussian  baseline               highconf                       0.995050  0.989895    0.995050       0.989895
+convae -> jpeg -> median -> gaussian  baseline               revsig -> noise                0.516536  0.516232    0.516799       0.517768
+convae -> jpeg -> median -> gaussian  baseline               revsig -> highconf             0.990099  0.969187    0.990099       0.989937
+convae -> jpeg -> median -> gaussian  baseline               noise -> revsig                0.970620  0.961016    0.970186       0.971772
+convae -> jpeg -> median -> gaussian  baseline               noise -> highconf              0.993257  0.980260    0.993148       0.986357
+convae -> jpeg -> median -> gaussian  baseline               highconf -> revsig             0.990099  0.969187    0.990099       0.989937
+convae -> jpeg -> median -> gaussian  baseline               highconf -> noise              0.993386  0.978647    0.993386       0.985793
+convae -> jpeg -> median -> gaussian  baseline               revsig -> noise -> highconf    0.505789  0.504769    0.505966       0.506465
+convae -> jpeg -> median -> gaussian  baseline               revsig -> highconf -> noise    0.516536  0.516232    0.516799       0.517768
+convae -> jpeg -> median -> gaussian  baseline               noise -> revsig -> highconf    0.970134  0.960203    0.969699       0.971177
+convae -> jpeg -> median -> gaussian  baseline               noise -> highconf -> revsig    0.942437  0.928021    0.942437       0.944143
+convae -> jpeg -> median -> gaussian  baseline               highconf -> revsig -> noise    0.516536  0.516232    0.516799       0.517768
+convae -> jpeg -> median -> gaussian  baseline               highconf -> noise -> revsig    0.967619  0.961016    0.967075       0.971772
+none                                  adversarial_retrained  none                           1.000000  0.999828    1.000000       1.000000
+none                                  adversarial_retrained  revsig                         0.971806  0.962581    0.963438       0.961615
+none                                  adversarial_retrained  noise                          1.000000  0.995905    0.998977       0.996078
+none                                  adversarial_retrained  highconf                       1.000000  0.999914    1.000000       1.000000
+none                                  adversarial_retrained  revsig -> noise                0.521659  0.525189    0.521053       0.523316
+none                                  adversarial_retrained  revsig -> highconf             0.971806  0.962581    0.963438       0.961615
+none                                  adversarial_retrained  noise -> revsig                0.974174  0.970796    0.971615       0.971227
+none                                  adversarial_retrained  noise -> highconf              1.000000  0.993260    0.999402       0.993432
+none                                  adversarial_retrained  highconf -> revsig             0.994282  0.982891    0.984291       0.984276
+none                                  adversarial_retrained  highconf -> noise              1.000000  0.995905    0.998977       0.995991
+none                                  adversarial_retrained  revsig -> noise -> highconf    0.504899  0.509624    0.504991       0.508932
+none                                  adversarial_retrained  revsig -> highconf -> noise    0.521659  0.525189    0.521053       0.523316
+none                                  adversarial_retrained  noise -> revsig -> highconf    0.973602  0.970310    0.971128       0.970740
+none                                  adversarial_retrained  noise -> highconf -> revsig    0.945363  0.949886    0.944472       0.950045
+none                                  adversarial_retrained  highconf -> revsig -> noise    0.520574  0.521199    0.519913       0.521691
+none                                  adversarial_retrained  highconf -> noise -> revsig    0.984582  0.977663    0.980318       0.979154
+convae -> jpeg                        adversarial_retrained  none                           1.000000  1.000000    1.000000       1.000000
+convae -> jpeg                        adversarial_retrained  revsig                         0.969437  0.959326    0.961884       0.958053
+convae -> jpeg                        adversarial_retrained  noise                          0.999488  0.999488    0.999488       0.999403
+convae -> jpeg                        adversarial_retrained  highconf                       1.000000  1.000000    1.000000       1.000000
+convae -> jpeg                        adversarial_retrained  revsig -> noise                0.521972  0.522025    0.521576       0.521224
+convae -> jpeg                        adversarial_retrained  revsig -> highconf             0.969437  0.959326    0.961884       0.958053
+convae -> jpeg                        adversarial_retrained  noise -> revsig                0.972422  0.971484    0.971484       0.971484
+convae -> jpeg                        adversarial_retrained  noise -> highconf              1.000000  0.999658    0.999743       0.999488
+convae -> jpeg                        adversarial_retrained  highconf -> revsig             0.987259  0.987574    0.987191       0.983095
+convae -> jpeg                        adversarial_retrained  highconf -> noise              0.999488  0.999488    0.999488       0.999403
+convae -> jpeg                        adversarial_retrained  revsig -> noise -> highconf    0.507922  0.508470    0.507837       0.508301
+convae -> jpeg                        adversarial_retrained  revsig -> highconf -> noise    0.521972  0.522025    0.521576       0.521224
+convae -> jpeg                        adversarial_retrained  noise -> revsig -> highconf    0.971850  0.970998    0.970998       0.970998
+convae -> jpeg                        adversarial_retrained  noise -> highconf -> revsig    0.945291  0.945082    0.945206       0.944997
+convae -> jpeg                        adversarial_retrained  highconf -> revsig -> noise    0.520153  0.520483    0.520346       0.521367
+convae -> jpeg                        adversarial_retrained  highconf -> noise -> revsig    0.983298  0.981853    0.982786       0.981609
+jpeg -> median -> gaussian            adversarial_retrained  none                           1.000000  0.995050    1.000000       0.995050
+jpeg -> median -> gaussian            adversarial_retrained  revsig                         1.000000  0.995050    1.000000       0.995050
+jpeg -> median -> gaussian            adversarial_retrained  noise                          1.000000  0.993433    1.000000       0.993433
+jpeg -> median -> gaussian            adversarial_retrained  highconf                       1.000000  0.995050    1.000000       0.995050
+jpeg -> median -> gaussian            adversarial_retrained  revsig -> noise                0.517483  0.517269    0.517483       0.517269
+jpeg -> median -> gaussian            adversarial_retrained  revsig -> highconf             1.000000  0.995050    1.000000       0.995050
+jpeg -> median -> gaussian            adversarial_retrained  noise -> revsig                0.976119  0.975947    0.976119       0.975947
+jpeg -> median -> gaussian            adversarial_retrained  noise -> highconf              1.000000  0.993217    1.000000       0.993217
+jpeg -> median -> gaussian            adversarial_retrained  highconf -> revsig             1.000000  0.995050    1.000000       0.995050
+jpeg -> median -> gaussian            adversarial_retrained  highconf -> noise              1.000000  0.993433    1.000000       0.993433
+jpeg -> median -> gaussian            adversarial_retrained  revsig -> noise -> highconf    0.505966  0.505966    0.505966       0.505966
+jpeg -> median -> gaussian            adversarial_retrained  revsig -> highconf -> noise    0.517483  0.517269    0.517483       0.517269
+jpeg -> median -> gaussian            adversarial_retrained  noise -> revsig -> highconf    0.975632  0.975460    0.975632       0.975460
+jpeg -> median -> gaussian            adversarial_retrained  noise -> highconf -> revsig    0.950130  0.949701    0.950130       0.949701
+jpeg -> median -> gaussian            adversarial_retrained  highconf -> revsig -> noise    0.517483  0.517269    0.517483       0.517269
+jpeg -> median -> gaussian            adversarial_retrained  highconf -> noise -> revsig    0.976119  0.975947    0.976119       0.975947
+convae -> jpeg -> median -> gaussian  adversarial_retrained  none                           0.995050  0.995050    0.995050       0.995050
+convae -> jpeg -> median -> gaussian  adversarial_retrained  revsig                         0.995050  0.995050    0.995050       0.995050
+convae -> jpeg -> median -> gaussian  adversarial_retrained  noise                          0.993433  0.993433    0.993433       0.993433
+convae -> jpeg -> median -> gaussian  adversarial_retrained  highconf                       0.995050  0.995050    0.995050       0.995050
+convae -> jpeg -> median -> gaussian  adversarial_retrained  revsig -> noise                0.517269  0.517269    0.517269       0.517269
+convae -> jpeg -> median -> gaussian  adversarial_retrained  revsig -> highconf             0.995050  0.995050    0.995050       0.995050
+convae -> jpeg -> median -> gaussian  adversarial_retrained  noise -> revsig                0.975947  0.975947    0.975947       0.975947
+convae -> jpeg -> median -> gaussian  adversarial_retrained  noise -> highconf              0.993217  0.993217    0.993217       0.993217
+convae -> jpeg -> median -> gaussian  adversarial_retrained  highconf -> revsig             0.995050  0.995050    0.995050       0.995050
+convae -> jpeg -> median -> gaussian  adversarial_retrained  highconf -> noise              0.993433  0.993433    0.993433       0.993433
+convae -> jpeg -> median -> gaussian  adversarial_retrained  revsig -> noise -> highconf    0.505966  0.505966    0.505966       0.505966
+convae -> jpeg -> median -> gaussian  adversarial_retrained  revsig -> highconf -> noise    0.517269  0.517269    0.517269       0.517269
+convae -> jpeg -> median -> gaussian  adversarial_retrained  noise -> revsig -> highconf    0.975460  0.975460    0.975460       0.975460
+convae -> jpeg -> median -> gaussian  adversarial_retrained  noise -> highconf -> revsig    0.949701  0.949701    0.949701       0.949701
+convae -> jpeg -> median -> gaussian  adversarial_retrained  highconf -> revsig -> noise    0.517269  0.517269    0.517269       0.517269
+convae -> jpeg -> median -> gaussian  adversarial_retrained  highconf -> noise -> revsig    0.975947  0.975947    0.975947       0.975947
+none                                  robust                 none                           1.000000  1.000000    1.000000       1.000000
+none                                  robust                 revsig                         0.956414  0.963354    0.956574       0.963997
+none                                  robust                 noise                          0.988386  0.988712    0.988386       0.988514
+none                                  robust                 highconf                       1.000000  1.000000    1.000000       1.000000
+none                                  robust                 revsig -> noise                0.530164  0.532113    0.530251       0.532129
+none                                  robust                 revsig -> highconf             0.956414  0.963354    0.956574       0.963997
+none                                  robust                 noise -> revsig                0.958004  0.954540    0.957483       0.956714
+none                                  robust                 noise -> highconf              0.987210  0.987427    0.987210       0.987427
+none                                  robust                 highconf -> revsig             0.957849  0.954417    0.957760       0.953534
+none                                  robust                 highconf -> noise              0.988479  0.988677    0.988568       0.988677
+none                                  robust                 revsig -> noise -> highconf    0.511893  0.511392    0.512219       0.511289
+none                                  robust                 revsig -> highconf -> noise    0.530164  0.532113    0.530251       0.532129
+none                                  robust                 noise -> revsig -> highconf    0.957300  0.953836    0.956670       0.955901
+none                                  robust                 noise -> highconf -> revsig    0.932377  0.926164    0.930999       0.926366
+none                                  robust                 highconf -> revsig -> noise    0.526175  0.526582    0.526605       0.526754
+none                                  robust                 highconf -> noise -> revsig    0.972751  0.971063    0.972917       0.972366
+convae -> jpeg                        robust                 none                           1.000000  1.000000    1.000000       1.000000
+convae -> jpeg                        robust                 revsig                         0.955803  0.955503    0.955498       0.955364
+convae -> jpeg                        robust                 noise                          0.987338  0.988207    0.984946       0.985202
+convae -> jpeg                        robust                 highconf                       1.000000  1.000000    1.000000       1.000000
+convae -> jpeg                        robust                 revsig -> noise                0.530037  0.529864    0.529797       0.529769
+convae -> jpeg                        robust                 revsig -> highconf             0.955803  0.955503    0.955498       0.955364
+convae -> jpeg                        robust                 noise -> revsig                0.954495  0.950819    0.956055       0.957444
+convae -> jpeg                        robust                 noise -> highconf              0.987210  0.986544    0.987210       0.986435
+convae -> jpeg                        robust                 highconf -> revsig             0.950358  0.949161    0.950098       0.950422
+convae -> jpeg                        robust                 highconf -> noise              0.987935  0.988191    0.985490       0.985310
+convae -> jpeg                        robust                 revsig -> noise -> highconf    0.512601  0.512787    0.512614       0.512974
+convae -> jpeg                        robust                 revsig -> highconf -> noise    0.530037  0.529864    0.529797       0.529769
+convae -> jpeg                        robust                 noise -> revsig -> highconf    0.953791  0.950029    0.955156       0.956631
+convae -> jpeg                        robust                 noise -> highconf -> revsig    0.918346  0.914078    0.916343       0.919813
+convae -> jpeg                        robust                 highconf -> revsig -> noise    0.526053  0.525974    0.525795       0.526313
+convae -> jpeg                        robust                 highconf -> noise -> revsig    0.975132  0.969392    0.976171       0.972636
+jpeg -> median -> gaussian            robust                 none                           0.984536  0.984536    0.984536       0.984536
+jpeg -> median -> gaussian            robust                 revsig                         0.984536  0.984536    0.984536       0.984536
+jpeg -> median -> gaussian            robust                 noise                          0.981524  0.981524    0.981524       0.981524
+jpeg -> median -> gaussian            robust                 highconf                       0.984536  0.984536    0.984536       0.984536
+jpeg -> median -> gaussian            robust                 revsig -> noise                0.517239  0.517239    0.517239       0.517239
+jpeg -> median -> gaussian            robust                 revsig -> highconf             0.984536  0.984536    0.984536       0.984536
+jpeg -> median -> gaussian            robust                 noise -> revsig                0.961686  0.961686    0.961686       0.961686
+jpeg -> median -> gaussian            robust                 noise -> highconf              0.980766  0.980766    0.980766       0.980766
+jpeg -> median -> gaussian            robust                 highconf -> revsig             0.984536  0.984536    0.984536       0.984536
+jpeg -> median -> gaussian            robust                 highconf -> noise              0.981524  0.981524    0.981524       0.981524
+jpeg -> median -> gaussian            robust                 revsig -> noise -> highconf    0.505560  0.505560    0.505560       0.505560
+jpeg -> median -> gaussian            robust                 revsig -> highconf -> noise    0.517239  0.517239    0.517239       0.517239
+jpeg -> median -> gaussian            robust                 noise -> revsig -> highconf    0.960982  0.960982    0.960982       0.960982
+jpeg -> median -> gaussian            robust                 noise -> highconf -> revsig    0.937586  0.937586    0.937586       0.937586
+jpeg -> median -> gaussian            robust                 highconf -> revsig -> noise    0.517239  0.517239    0.517239       0.517239
+jpeg -> median -> gaussian            robust                 highconf -> noise -> revsig    0.961686  0.961686    0.961686       0.961686
+convae -> jpeg -> median -> gaussian  robust                 none                           0.984536  0.984536    0.984536       0.984536
+convae -> jpeg -> median -> gaussian  robust                 revsig                         0.984536  0.984536    0.984536       0.984536
+convae -> jpeg -> median -> gaussian  robust                 noise                          0.981524  0.981524    0.981524       0.981524
+convae -> jpeg -> median -> gaussian  robust                 highconf                       0.984536  0.984536    0.984536       0.984536
+convae -> jpeg -> median -> gaussian  robust                 revsig -> noise                0.517239  0.517239    0.517239       0.517239
+convae -> jpeg -> median -> gaussian  robust                 revsig -> highconf             0.984536  0.984536    0.984536       0.984536
+convae -> jpeg -> median -> gaussian  robust                 noise -> revsig                0.961686  0.961686    0.961686       0.961686
+convae -> jpeg -> median -> gaussian  robust                 noise -> highconf              0.980766  0.980766    0.980766       0.980766
+convae -> jpeg -> median -> gaussian  robust                 highconf -> revsig             0.984536  0.984536    0.984536       0.984536
+convae -> jpeg -> median -> gaussian  robust                 highconf -> noise              0.981524  0.981524    0.981524       0.981524
+convae -> jpeg -> median -> gaussian  robust                 revsig -> noise -> highconf    0.505560  0.505560    0.505560       0.505560
+convae -> jpeg -> median -> gaussian  robust                 revsig -> highconf -> noise    0.517239  0.517239    0.517239       0.517239
+convae -> jpeg -> median -> gaussian  robust                 noise -> revsig -> highconf    0.960982  0.960982    0.960982       0.960982
+convae -> jpeg -> median -> gaussian  robust                 noise -> highconf -> revsig    0.937586  0.937586    0.937586       0.937586
+convae -> jpeg -> median -> gaussian  robust                 highconf -> revsig -> noise    0.517239  0.517239    0.517239       0.517239
+convae -> jpeg -> median -> gaussian  robust                 highconf -> noise -> revsig    0.961686  0.961686    0.961686       0.961686
+none                                  grl                    none                           0.999828  0.999572    0.999828       0.999549
+none                                  grl                    revsig                         0.959362  0.940174    0.959541       0.952344
+none                                  grl                    noise                          0.986111  0.982037    0.986111       0.985916
+none                                  grl                    highconf                       0.989786  0.989895    0.989786       0.994898
+none                                  grl                    revsig -> noise                0.523615  0.525985    0.523841       0.526953
+none                                  grl                    revsig -> highconf             0.959362  0.940174    0.959541       0.952344
+none                                  grl                    noise -> revsig                0.972831  0.966827    0.972660       0.970738
+none                                  grl                    noise -> highconf              0.985429  0.979947    0.985429       0.986445
+none                                  grl                    highconf -> revsig             0.980001  0.963639    0.980001       0.969122
+none                                  grl                    highconf -> noise              0.986111  0.982045    0.986111       0.985827
+none                                  grl                    revsig -> noise -> highconf    0.505602  0.507160    0.508671       0.507317
+none                                  grl                    revsig -> highconf -> noise    0.523615  0.525985    0.523841       0.526953
+none                                  grl                    noise -> revsig -> highconf    0.972259  0.966232    0.972088       0.970034
+none                                  grl                    noise -> highconf -> revsig    0.944674  0.941930    0.944371       0.937480
+none                                  grl                    highconf -> revsig -> noise    0.520515  0.523036    0.521213       0.524923
+none                                  grl                    highconf -> noise -> revsig    0.978720  0.969983    0.976608       0.975217
+convae -> jpeg                        grl                    none                           0.999402  0.999316    0.999316       0.999402
+convae -> jpeg                        grl                    revsig                         0.950320  0.946062    0.950314       0.948179
+convae -> jpeg                        grl                    noise                          0.986203  0.986294    0.986203       0.986294
+convae -> jpeg                        grl                    highconf                       0.989786  0.990702    0.989786       0.990702
+convae -> jpeg                        grl                    revsig -> noise                0.524249  0.523650    0.523500       0.525375
+convae -> jpeg                        grl                    revsig -> highconf             0.950320  0.946062    0.950314       0.948179
+convae -> jpeg                        grl                    noise -> revsig                0.973713  0.973082    0.973457       0.970257
+convae -> jpeg                        grl                    noise -> highconf              0.985343  0.985343    0.985343       0.985572
+convae -> jpeg                        grl                    highconf -> revsig             0.978129  0.983886    0.978129       0.980740
+convae -> jpeg                        grl                    highconf -> noise              0.986111  0.986294    0.986111       0.986294
+convae -> jpeg                        grl                    revsig -> noise -> highconf    0.507517  0.507456    0.507616       0.513578
+convae -> jpeg                        grl                    revsig -> highconf -> noise    0.524249  0.523650    0.523500       0.525375
+convae -> jpeg                        grl                    noise -> revsig -> highconf    0.973226  0.972596    0.972970       0.969662
+convae -> jpeg                        grl                    noise -> highconf -> revsig    0.944383  0.942158    0.944383       0.944059
+convae -> jpeg                        grl                    highconf -> revsig -> noise    0.522271  0.521892    0.521110       0.522437
+convae -> jpeg                        grl                    highconf -> noise -> revsig    0.979846  0.980367    0.979584       0.980105
+jpeg -> median -> gaussian            grl                    none                           0.989786  0.995050    0.989786       0.995050
+jpeg -> median -> gaussian            grl                    revsig                         0.989786  0.974257    0.989786       0.974257
+jpeg -> median -> gaussian            grl                    noise                          0.986023  0.978474    0.986023       0.981261
+jpeg -> median -> gaussian            grl                    highconf                       0.989786  0.984632    0.989786       0.995050
+jpeg -> median -> gaussian            grl                    revsig -> noise                0.517223  0.517088    0.517223       0.517088
+jpeg -> median -> gaussian            grl                    revsig -> highconf             0.989786  0.974257    0.989786       0.974257
+jpeg -> median -> gaussian            grl                    noise -> revsig                0.972338  0.968729    0.972338       0.964736
+jpeg -> median -> gaussian            grl                    noise -> highconf              0.985300  0.978540    0.985300       0.982247
+jpeg -> median -> gaussian            grl                    highconf -> revsig             0.989786  0.974342    0.989786       0.974257
+jpeg -> median -> gaussian            grl                    highconf -> noise              0.986023  0.978474    0.986023       0.981261
+jpeg -> median -> gaussian            grl                    revsig -> noise -> highconf    0.505921  0.505785    0.505921       0.505785
+jpeg -> median -> gaussian            grl                    revsig -> highconf -> noise    0.517223  0.517088    0.517223       0.517088
+jpeg -> median -> gaussian            grl                    noise -> revsig -> highconf    0.971766  0.968048    0.971766       0.964141
+jpeg -> median -> gaussian            grl                    noise -> highconf -> revsig    0.944261  0.939422    0.944261       0.936539
+jpeg -> median -> gaussian            grl                    highconf -> revsig -> noise    0.517223  0.517088    0.517223       0.517088
+jpeg -> median -> gaussian            grl                    highconf -> noise -> revsig    0.972338  0.960447    0.972338       0.964736
+convae -> jpeg -> median -> gaussian  grl                    none                           0.989786  0.989786    0.989786       0.989786
+convae -> jpeg -> median -> gaussian  grl                    revsig                         0.989786  0.989786    0.989786       0.989786
+convae -> jpeg -> median -> gaussian  grl                    noise                          0.986023  0.986023    0.986023       0.986023
+convae -> jpeg -> median -> gaussian  grl                    highconf                       0.989786  0.989786    0.989786       0.989786
+convae -> jpeg -> median -> gaussian  grl                    revsig -> noise                0.517223  0.517223    0.517223       0.517223
+convae -> jpeg -> median -> gaussian  grl                    revsig -> highconf             0.989786  0.989786    0.989786       0.989786
+convae -> jpeg -> median -> gaussian  grl                    noise -> revsig                0.972338  0.972338    0.972338       0.972338
+convae -> jpeg -> median -> gaussian  grl                    noise -> highconf              0.985300  0.985300    0.985300       0.985300
+convae -> jpeg -> median -> gaussian  grl                    highconf -> revsig             0.989786  0.989786    0.989786       0.989786
+convae -> jpeg -> median -> gaussian  grl                    highconf -> noise              0.986023  0.986023    0.986023       0.986023
+convae -> jpeg -> median -> gaussian  grl                    revsig -> noise -> highconf    0.505921  0.505921    0.505921       0.505921
+convae -> jpeg -> median -> gaussian  grl                    revsig -> highconf -> noise    0.517223  0.517223    0.517223       0.517223
+convae -> jpeg -> median -> gaussian  grl                    noise -> revsig -> highconf    0.971766  0.971766    0.971766       0.971766
+convae -> jpeg -> median -> gaussian  grl                    noise -> highconf -> revsig    0.944261  0.944261    0.944261       0.944261
+convae -> jpeg -> median -> gaussian  grl                    highconf -> revsig -> noise    0.517223  0.517223    0.517223       0.517223
+convae -> jpeg -> median -> gaussian  grl                    highconf -> noise -> revsig    0.972338  0.972338    0.972338       0.972338
+none                                  convae_rn50            none                           1.000000  1.000000    1.000000       1.000000
+none                                  convae_rn50            revsig                         0.978024  0.965044    0.976653       0.964512
+none                                  convae_rn50            noise                          1.000000  0.992854    1.000000       0.992943
+none                                  convae_rn50            highconf                       1.000000  1.000000    1.000000       1.000000
+none                                  convae_rn50            revsig -> noise                0.523839  0.524444    0.523828       0.523486
+none                                  convae_rn50            revsig -> highconf             0.978024  0.965044    0.976653       0.964512
+none                                  convae_rn50            noise -> revsig                0.974882  0.974094    0.975500       0.974779
+none                                  convae_rn50            noise -> highconf              1.000000  0.993902    1.000000       0.993902
+none                                  convae_rn50            highconf -> revsig             1.000000  0.984066    1.000000       0.983626
+none                                  convae_rn50            highconf -> noise              1.000000  0.992495    1.000000       0.992585
+none                                  convae_rn50            revsig -> noise -> highconf    0.503912  0.504555    0.503740       0.504358
+none                                  convae_rn50            revsig -> highconf -> noise    0.523839  0.524444    0.523828       0.523486
+none                                  convae_rn50            noise -> revsig -> highconf    0.974287  0.973499    0.974905       0.974184
+none                                  convae_rn50            noise -> highconf -> revsig    0.947436  0.946278    0.948616       0.946598
+none                                  convae_rn50            highconf -> revsig -> noise    0.520423  0.521048    0.520508       0.521219
+none                                  convae_rn50            highconf -> noise -> revsig    0.984145  0.973954    0.984145       0.973954
+jpeg -> median -> gaussian            convae_rn50            none                           1.000000  0.994845    1.000000       0.994845
+jpeg -> median -> gaussian            convae_rn50            revsig                         1.000000  0.994845    1.000000       0.994845
+jpeg -> median -> gaussian            convae_rn50            noise                          1.000000  0.992360    1.000000       0.992360
+jpeg -> median -> gaussian            convae_rn50            highconf                       1.000000  0.994845    1.000000       0.994845
+jpeg -> median -> gaussian            convae_rn50            revsig -> noise                0.517483  0.517438    0.517483       0.517438
+jpeg -> median -> gaussian            convae_rn50            revsig -> highconf             1.000000  0.994845    1.000000       0.994845
+jpeg -> median -> gaussian            convae_rn50            noise -> revsig                0.976119  0.972128    0.976119       0.972128
+jpeg -> median -> gaussian            convae_rn50            noise -> highconf              1.000000  0.993140    1.000000       0.993140
+jpeg -> median -> gaussian            convae_rn50            highconf -> revsig             1.000000  0.994845    1.000000       0.994845
+jpeg -> median -> gaussian            convae_rn50            highconf -> noise              1.000000  0.992360    1.000000       0.992360
+jpeg -> median -> gaussian            convae_rn50            revsig -> noise -> highconf    0.505966  0.505922    0.505966       0.505922
+jpeg -> median -> gaussian            convae_rn50            revsig -> highconf -> noise    0.517483  0.517438    0.517483       0.517438
+jpeg -> median -> gaussian            convae_rn50            noise -> revsig -> highconf    0.975632  0.971533    0.975632       0.971533
+jpeg -> median -> gaussian            convae_rn50            noise -> highconf -> revsig    0.950130  0.944800    0.950130       0.944800
+jpeg -> median -> gaussian            convae_rn50            highconf -> revsig -> noise    0.517483  0.517438    0.517483       0.517438
+jpeg -> median -> gaussian            convae_rn50            highconf -> noise -> revsig    0.976119  0.972128    0.976119       0.972128

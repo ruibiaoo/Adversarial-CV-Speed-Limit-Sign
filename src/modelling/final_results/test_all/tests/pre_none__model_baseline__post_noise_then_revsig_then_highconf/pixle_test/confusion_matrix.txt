@@ -1,0 +1,10 @@
+Confusion matrix
+
+Actual \ Predicted      10_MPH      20_MPH      30_MPH      40_MPH      50_MPH      60_MPH      70_MPH
+10_MPH                 2           1           0           0           0           0           0
+20_MPH                 4           2           1           2           1           1           1
+30_MPH                 3           8           7           0           0           1           1
+40_MPH                 7          17           3           0           4           3           1
+50_MPH                 4           6           0           1           1           0           2
+60_MPH                 0           5           0           0           1           7           0
+70_MPH                 3          12           0           1           2           0           0

@@ -15,6 +15,9 @@ No attack data or attack knowledge is used here: the grids come from general
 image-processing ranges. They are not tuned at the moment: test_defences.py
 tests one fixed setting per defence.
 """
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
 import cv2
 import numpy as np
 
@@ -32,6 +35,27 @@ GRIDS = {
 }
 SMOOTHING_SAMPLES = 32  # n noisy copies per image, fixed a priori (not tuned)
 SMOOTHING_SEED = 4266   # same as the project seed, so predictions are reproducible
+SMOOTHING_WORKERS = 8   # worker threads for parallel Gaussian preprocessing
+
+_EXECUTORS = {}
+_EXECUTOR_LOCK = threading.Lock()
+
+
+def _get_executor(workers=SMOOTHING_WORKERS):
+    """Return a reusable ThreadPoolExecutor with ``workers`` threads."""
+    workers = max(1, int(workers))
+    with _EXECUTOR_LOCK:
+        executor = _EXECUTORS.get(workers)
+        if executor is None:
+            executor = ThreadPoolExecutor(max_workers=workers)
+            _EXECUTORS[workers] = executor
+        return executor
+
+
+def _spawn_rngs(rng, count):
+    """Create ``count`` independent deterministic child RNGs from ``rng``."""
+    seeds = rng.integers(0, 2**32 - 1, size=int(count), dtype=np.uint32)
+    return [np.random.default_rng(int(s)) for s in seeds]
 
 
 def jpeg_compress(image, quality):
@@ -48,14 +72,37 @@ def median_smooth(image, kernel):
     return cv2.medianBlur(np.ascontiguousarray(image, dtype=np.uint8), int(kernel))
 
 
-def gaussian_noise(images, sigma, rng):
+def _gaussian_noise_slice(images, sigma, rng):
+    """Single-worker helper: images + N(0, sigma^2) noise in float32, clipped to 0-255."""
+    noisy = rng.standard_normal(images.shape, dtype=np.float32)
+    noisy *= np.float32(sigma)
+    noisy += np.asarray(images, dtype=np.float32)
+    np.clip(noisy, 0.0, 255.0, out=noisy)
+    return noisy
+
+
+def gaussian_noise(images, sigma, rng, workers=SMOOTHING_WORKERS):
     """images + N(0, sigma^2) noise in pixel units, clipped to 0-255. Returns float32."""
-    noisy = images.astype(np.float32) + rng.normal(0.0, float(sigma), images.shape).astype(np.float32)
-    return np.clip(noisy, 0.0, 255.0)
+    images = np.asarray(images)
+    if len(images) == 0:
+        return images.astype(np.float32)
+    num_workers = min(max(1, int(workers)), len(images))
+    if num_workers <= 1:
+        return _gaussian_noise_slice(images, sigma, rng)
+    slices = np.array_split(images, num_workers)
+    child_rngs = _spawn_rngs(rng, num_workers)
+    executor = _get_executor(num_workers)
+    parts = list(
+        executor.map(
+            lambda args: _gaussian_noise_slice(args[0], sigma, args[1]),
+            zip(slices, child_rngs),
+        )
+    )
+    return np.concatenate(parts, axis=0)
 
 
 def randomized_smoothing_probs(classify, images, sigma, n=SMOOTHING_SAMPLES, seed=SMOOTHING_SEED,
-                               chunk=64):
+                               chunk=64, workers=SMOOTHING_WORKERS):
     """Vote share of each class over n noisy copies of each image.
 
     classify: fn(float32 batch 0-255) -> class scores. images: uint8 BxHxWx3.
@@ -65,12 +112,40 @@ def randomized_smoothing_probs(classify, images, sigma, n=SMOOTHING_SAMPLES, see
     """
     rng = np.random.default_rng(seed)
     per_step = max(1, chunk // n)  # images per model call, bounds memory to ~chunk copies
-    counts = []
-    for start in range(0, len(images), per_step):
+    starts = list(range(0, len(images), per_step))
+    if not starts:
+        return np.zeros((0, 0), dtype=np.float32)
+
+    workers = max(1, int(workers))
+    chunk_rngs = _spawn_rngs(rng, len(starts))
+
+    if len(starts) == 1 or workers <= 1:
+        counts = []
+        for start, chunk_rng in zip(starts, chunk_rngs):
+            batch = images[start:start + per_step]
+            copies = np.repeat(batch, n, axis=0)  # (b*n)xHxWx3, copies of one image are adjacent
+            scores = np.asarray(classify(gaussian_noise(copies, sigma, chunk_rng, workers=workers)))
+            pred = np.argmax(scores, axis=1).reshape(len(batch), n)
+            counts += [np.bincount(p, minlength=scores.shape[1]) for p in pred]
+        return np.stack(counts).astype(np.float32) / float(n)
+
+    executor = _get_executor(workers)
+
+    def prepare_chunk(start, chunk_rng):
         batch = images[start:start + per_step]
         copies = np.repeat(batch, n, axis=0)  # (b*n)xHxWx3, copies of one image are adjacent
-        scores = np.asarray(classify(gaussian_noise(copies, sigma, rng)))
-        pred = np.argmax(scores, axis=1).reshape(len(batch), n)
+        noisy = _gaussian_noise_slice(copies, sigma, chunk_rng)
+        return len(batch), noisy
+
+    futures = [
+        executor.submit(prepare_chunk, start, chunk_rng)
+        for start, chunk_rng in zip(starts, chunk_rngs)
+    ]
+    counts = []
+    for fut in futures:
+        batch_len, noisy = fut.result()
+        scores = np.asarray(classify(noisy))
+        pred = np.argmax(scores, axis=1).reshape(batch_len, n)
         counts += [np.bincount(p, minlength=scores.shape[1]) for p in pred]
     return np.stack(counts).astype(np.float32) / float(n)
 
@@ -99,7 +174,8 @@ def make_predictor(name, model, params=None):
         sigma = float(params["sigma"])
         n = int(params.get("samples", SMOOTHING_SAMPLES))
         seed = int(params.get("seed", SMOOTHING_SEED))
-        return lambda images: randomized_smoothing_probs(classify, images, sigma, n, seed)
+        workers = int(params.get("workers", SMOOTHING_WORKERS))
+        return lambda images: randomized_smoothing_probs(classify, images, sigma, n, seed, workers=workers)
 
     transform = transform_for(name, params)
 
@@ -130,10 +206,15 @@ def make_chain_predictor(steps, model, params):
     def classify(x):
         return model.predict_on_batch(preprocess_input(np.array(x, dtype=np.float32)))
 
-    def filtered(images, names):
+    def filtered(images, names, workers=1):
         for name in names:
             transform = transform_for(name, params[name])
-            images = np.stack([transform(im) for im in _to_uint8(images)])
+            uint8_imgs = _to_uint8(images)
+            if workers > 1 and len(uint8_imgs) > 1:
+                executor = _get_executor(workers)
+                images = np.stack(list(executor.map(transform, uint8_imgs)))
+            else:
+                images = np.stack([transform(im) for im in uint8_imgs])
         return images
 
     if GAUSSIAN not in steps:
@@ -144,15 +225,46 @@ def make_chain_predictor(steps, model, params):
     sigma = float(params[GAUSSIAN]["sigma"])
     n = int(params[GAUSSIAN].get("samples", SMOOTHING_SAMPLES))
     seed = int(params[GAUSSIAN].get("seed", SMOOTHING_SEED))
+    workers = max(1, int(params[GAUSSIAN].get("workers", SMOOTHING_WORKERS)))
 
     def predict(images):
         rng = np.random.default_rng(seed)  # fixed per call, as in randomized_smoothing_probs
+        starts = list(range(0, len(images), 2))  # 2 images x n copies per model call
+        if not starts:
+            return np.zeros((0, 0), dtype=np.float32)
+
+        chunk_rngs = _spawn_rngs(rng, len(starts))
+
+        if len(starts) == 1 or workers <= 1:
+            counts = []
+            for start, chunk_rng in zip(starts, chunk_rngs):
+                batch = filtered(images[start:start + 2], before, workers=workers)
+                noisy = gaussian_noise(np.repeat(batch, n, axis=0), sigma, chunk_rng, workers=workers)
+                ready = filtered(noisy, after, workers=workers)
+                caffe_batch = preprocess_input(np.array(ready, dtype=np.float32))
+                scores = np.asarray(model.predict_on_batch(caffe_batch))
+                pred = np.argmax(scores, axis=1).reshape(len(batch), n)
+                counts += [np.bincount(p, minlength=scores.shape[1]) for p in pred]
+            return np.stack(counts).astype(np.float32) / float(n)
+
+        executor = _get_executor(workers)
+
+        def prepare_chunk(start, chunk_rng):
+            batch = filtered(images[start:start + 2], before, workers=1)
+            noisy = _gaussian_noise_slice(np.repeat(batch, n, axis=0), sigma, chunk_rng)
+            ready = filtered(noisy, after, workers=1)
+            caffe_batch = preprocess_input(np.array(ready, dtype=np.float32))
+            return len(batch), caffe_batch
+
+        futures = [
+            executor.submit(prepare_chunk, start, chunk_rng)
+            for start, chunk_rng in zip(starts, chunk_rngs)
+        ]
         counts = []
-        for start in range(0, len(images), 2):  # 2 images x n copies per model call
-            batch = filtered(images[start:start + 2], before)
-            noisy = gaussian_noise(np.repeat(batch, n, axis=0), sigma, rng)
-            scores = np.asarray(classify(filtered(noisy, after)))
-            pred = np.argmax(scores, axis=1).reshape(len(batch), n)
+        for fut in futures:
+            batch_len, caffe_batch = fut.result()
+            scores = np.asarray(model.predict_on_batch(caffe_batch))
+            pred = np.argmax(scores, axis=1).reshape(batch_len, n)
             counts += [np.bincount(p, minlength=scores.shape[1]) for p in pred]
         return np.stack(counts).astype(np.float32) / float(n)
 

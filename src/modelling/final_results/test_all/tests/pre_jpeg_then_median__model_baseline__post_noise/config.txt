@@ -1,0 +1,20 @@
+TEST CONFIGURATION
+==================
+Preprocessing: jpeg -> median
+Preprocessing Details: jpeg_compression(quality=90) -> median_smoothing(kernel=7)
+Model: baseline
+Model Path: /app/runs/best_baseline.keras
+Postprocessing: noise
+Postprocessing Details: gaussian_noise(scale=0.2)
+Datasets: clean_test, pgd_test, pixle_test, pgdpixle_test
+Seed: 4266
+Number of Runs: 10
+
+RUNTIME SUMMARY
+===============
+Total Runtime (s): 91.961038
+Average Runtime per Run (s): 9.196104
+Total Runs: 10
+Total Inferences per Run: 460
+Average Time per Inference (s): 0.019992
+Average Time per Inference (ms): 19.9915
