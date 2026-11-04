@@ -12,6 +12,11 @@ so each chain is always compared with the undefended model.
   post         the 15 post-processing chains alone (pre = none), grouped by defence set, top 5 shaded
   combination  the top-5 pre chains x the top-5 post chains (PRE_TOP x POST_TOP), as one defence each
 
+plot_top / save_top draw two more charts over all 5 models: the global top-N tested rows (model + pre chain +
+post chain) by Mean Macro (attacked), and the top N/5 of each model. Rows that lower the clean metric by more than
+MAX_CLEAN_DROP vs the same model with no defence are left out (python processing_def_graphics.py --top 25 --out .
+saves top25_global.png and top25_per_model.png).
+
 Panels: the metric on the 4 test sets, then "Mean Macro (attacked)" = the mean of the metric over the PGD, Pixle
 and PGD + Pixle sets (blue = better than no defence, red = worse, number = change), then Avg Time per Inference.
 
@@ -37,6 +42,7 @@ processing_def_plots.ipynb (same folder) runs plot_all for every model and saves
 """
 import argparse
 import re
+import textwrap
 from functools import lru_cache
 from itertools import permutations
 from pathlib import Path
@@ -53,6 +59,8 @@ TAGS = {  # model name in the result files -> model file
 }
 MODEL_NAMES = {"baseline": "baseline", "robust": "robust", "grl": "GRL",
                "adversarial_retrained": "adversarial retrained", "convae_rn50": "ConvAE + ResNet50"}
+# Report names M0-M4; also the top-to-bottom order of the model groups in the per-model top chart
+MODEL_IDS = {"baseline": "M0", "grl": "M1", "adversarial_retrained": "M2", "robust": "M3", "convae_rn50": "M4"}
 ALIASES = {"adv_retrained": "adversarial_retrained"}
 NONE = "none"
 ATTACKED = ["pgd_test", "pixle_test", "pgdpixle_test"]
@@ -271,24 +279,27 @@ def _finish(axes, ticks, tick_labels, bold, italic, height, separators):
 TIME_NOTE = "Avg Time per Inference (ms): the whole pipeline, mean over the 4 test sets and 3 runs."
 
 
-def _header(fig, R, title, notes, rings=False):
-    """Title, notes and the colour legend above the panels (positions in inches from the top)."""
+def _header(fig, R, title, notes, rings=False, extra=0.0, ref="no defence", scores=False):
+    """Title, notes and the colour legend above the panels (positions in inches from the top).
+    extra: inches to add below the notes, for notes with more than 2 lines. ref: what the gray line is.
+    scores: the numbers next to the dots are the scores themselves, not the change."""
     h = fig.get_figheight()
-    fig.subplots_adjust(top=1 - 1.8 / h)
+    fig.subplots_adjust(top=1 - (1.8 + extra) / h)
     fig.text(0.01, 1 - 0.12 / h, title, ha="left", va="top", fontsize=13, fontweight="bold", color=INK)
     fig.text(0.01, 1 - 0.45 / h, notes, ha="left", va="top", fontsize=9, color=INK2)
     m = metric_label(R.metric)
     better = "lower" if R.sign < 0 else "higher"
     dot = lambda c, text: plt.Line2D([], [], marker="o", ls="", ms=7, color=c, mec=SURFACE, label=text)
-    handles = [plt.Line2D([], [], color=INK2, lw=1.2, label="gray line = no defence"),
+    handles = [plt.Line2D([], [], color=INK2, lw=1.2, label=f"gray line = {ref}"),
                dot(BLUE, f"blue = better than no defence ({better} {m})"),
                dot(RED, "red = worse than no defence"),
                dot(MUTED, "gray = same as no defence")]
     if rings:
         handles.append(plt.Line2D([], [], marker="o", ls="", ms=7, mfc="none", mec=INK2,
                                   label="ring = pre chain alone (post = none)"))
-    handles.append(plt.Line2D([], [], ls="", marker="", label=f"+0.123 next to a dot = change in {m} from no defence"))
-    fig.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.01, 1 - 0.85 / h), ncol=len(handles),
+    handles.append(plt.Line2D([], [], ls="", marker="", label=f"0.123 next to a dot = the {m} score" if scores
+                              else f"+0.123 next to a dot = change in {m} from no defence"))
+    fig.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.01, 1 - (0.85 + extra) / h), ncol=len(handles),
                fontsize=9, frameon=True, facecolor=SURFACE, edgecolor=GRID, handletextpad=0.6, columnspacing=2.0)
 
 
@@ -387,6 +398,222 @@ def plot_combined(tag, results_dir=RESULTS, metric=METRIC):
     return fig
 
 
+MAX_CLEAN_DROP = 0.025  # a ranked row may lower the clean metric by at most this (2.5%) vs the same model, no defence
+
+
+# Rows in the report tables (Table VIII: baseline; Table X: M4). The per-model top chart always shows them.
+REPORT_ROWS = {
+    "baseline": [("convae -> jpeg", "highconf"), ("convae -> jpeg", NONE), ("convae -> jpeg", "revsig")],
+    "convae_rn50": [(NONE, NONE), (NONE, "highconf -> revsig"), (NONE, "revsig")],
+}
+
+
+def rank_rows(tags, results_dir=RESULTS, metric=METRIC, max_clean_drop=MAX_CLEAN_DROP, skip=SKIP_PRE):
+    """Every tested row (model + pre chain + post chain; no defence included) of the given models, ranked by
+    Mean Macro (attacked). Rows that lower the clean metric by more than max_clean_drop compared with the same
+    model with no defence are left out. Equal scores share a rank (1, 1, 3, ...); the row with fewer defences
+    comes first, then the faster row. Pre chains that contain a name in skip are not ranked.
+    Returns ({tag: Results}, [(rank, tag, pre, post)], number left out)."""
+    Rs = {t: Results(t, results_dir, metric) for t in tags}
+    kept, dropped = [], 0
+    for t, R in Rs.items():
+        base_clean = R.value(NONE, NONE, "clean_test")
+        for p, q in R.rows:
+            if any(s in p for s in skip):
+                continue
+            if R.sign * (R.value(p, q, "clean_test") - base_clean) < -max_clean_drop - EPS:
+                dropped += 1
+            else:
+                kept.append((t, p, q))
+    score = lambda c: round(Rs[c[0]].sign * Rs[c[0]].value(c[1], c[2], MEAN_ATTACKED), 9)
+    n_def = lambda chain: 0 if chain == NONE else len(chain.split(" -> "))
+    # equal scores: fewer defences first (the same result with less to run), then the faster row
+    kept.sort(key=lambda c: (-score(c), n_def(c[1]) + n_def(c[2]), Rs[c[0]].ms(c[1], c[2])))
+    ranked = []
+    for i, c in enumerate(kept):
+        rank = ranked[-1][0] if i and score(c) == score(kept[i - 1]) else i + 1
+        ranked.append((rank, *c))
+    return Rs, ranked, dropped
+
+
+def _pre_group(p):
+    """Group key and title for a pre chain: chains with the same defences (in any order) share a group."""
+    parts = [] if p == NONE else p.split(" -> ")
+    if not parts:
+        return ("none",), "no pre chain"
+    if len(parts) == 1:
+        return ("single",), "single defences"
+    names = [d for d in ["convae"] + PRE_NAMES if d in parts]
+    return tuple(names), "{" + ", ".join(names) + "}" + (" (all orders)" if set(parts) == set(PRE_NAMES) else "")
+
+
+def _top_layout(entries, Rs, marked=()):
+    """entries: [(rank, tag, pre, post)] in rank order. Rows grouped by model, then by the defences in the
+    pre chain, then by pre chain (each group in best-rank-first order). Rows in marked get a star."""
+    tree = {}
+    for rank, t, p, q in entries:
+        key, title = _pre_group(p)
+        tree.setdefault(t, {}).setdefault(key, (title, {}))[1].setdefault(p, []).append((rank, q))
+    L = dict(rows=[], ticks=[], labels=[], model=set(), sets=set(), pre=set(), seps=[], spans=[])
+    y = 0.0
+    def tick(text, kind=None):
+        nonlocal y
+        L["ticks"].append(y); L["labels"].append(text)
+        if kind:
+            L[kind].add(y)
+        y += 1
+    for t, sets_ in tree.items():
+        R = Rs[t]
+        if L["rows"]:
+            L["seps"].append(y - 0.8)
+        mid = f"{MODEL_IDS[t]}: " if t in MODEL_IDS else ""
+        tick(f"{mid}{R.name} model  (no defence: mean attacked {R.value(NONE, NONE, MEAN_ATTACKED):.3f}, "
+             f"{R.ms(NONE, NONE):.1f} ms)", "model")
+        y0 = y - 0.5
+        for title, pres in sets_.values():
+            if NONE not in pres:  # the "no pre chain +" line already names this group
+                tick(f"  {title}", "sets")
+            for p, posts in pres.items():
+                tick(f"  {label(p)} +" if p != NONE else "  no pre chain +", "pre")
+                for rank, q in posts:
+                    name = ("none (no test-time defence)" if p == NONE else "none (pre chain alone)") if q == NONE \
+                        else label(q)
+                    L["rows"].append((y, t, p, q, rank))
+                    star = "  ★" if (t, p, q) in marked else ""
+                    tick(f"      {name}  [#{rank}]{star}")
+                y += 0.2
+        L["spans"].append((y0, y - 0.5, t))
+        y += 0.6
+    L["height"] = y - 0.8
+    return L
+
+
+def _value_panel_rows(ax, sign, title, rows, spans, rings, lim, xlabel):
+    """rows: [(y, v, base)], each row against its own base (the same model with no defence).
+    spans: [(y0, y1, base)] gray reference segments. rings: {y: v} hollow markers (the pre chain alone)."""
+    span = lim[1] - lim[0]
+    for y0, y1, base in spans:
+        ax.plot([base, base], [y0, y1], color=INK2, lw=1.2, zorder=1)
+    for y, v, base in rows:
+        d = v - base
+        col = MUTED if abs(d) <= EPS else (BLUE if d * sign > 0 else RED)
+        ax.plot([base, v], [y, y], color=col, lw=2, solid_capstyle="round", zorder=2)
+        if y in rings:
+            ax.scatter([rings[y]], [y], s=40, facecolor="none", ec=INK2, lw=1, zorder=4)
+        ax.scatter([v], [y], s=34, color=col, ec=SURFACE, lw=1.5, zorder=3)
+        # the score itself next to every dot: on the right, or on the left when the bar goes to the right
+        right = d >= -EPS
+        r = rings.get(y, v)
+        ring_in_way = (r >= v if right else r <= v) and abs(r - v) < 0.15 * span
+        edge = (max(v, r) if right else min(v, r)) if ring_in_way else v
+        gap = (0.04 if ring_in_way else 0.025) * span
+        x = edge + gap if right else edge - gap
+        txt = f"{v:.4f}" if EPS < abs(d) < 0.0005 else f"{v:.3f}"  # 4 decimals when 3 would hide the change
+        ax.text(x, y, txt, va="center", ha="left" if right else "right", fontsize=6.5, color=INK2)
+    ax.set_xlim(lim[0] - 0.12 * span, lim[1] + 0.16 * span)
+    ax.set_title(f"{title}\nscore; gray line = no defence", loc="left", fontsize=9,
+                 fontweight="bold" if title.startswith("Mean") else "normal")
+    ax.set_xlabel(xlabel)
+
+
+def _time_panel_rows(ax, rows, spans):
+    """rows: [(y, ms, base ms)]; spans: [(y0, y1, base ms)]. Log scale; label always on the right."""
+    vals = [v for _, v, _ in rows] + [b for _, _, b in spans]
+    top = max(vals)
+    ax.set_xscale("log")
+    ax.set_xlim(min(vals) * 0.8, top * 5)
+    ticks = [t for t in (2, 5, 10, 20, 50, 100, 200, 500, 1000) if ax.get_xlim()[0] <= t <= top * 1.5]
+    ax.set_xticks(ticks, [str(t) for t in ticks])
+    ax.xaxis.set_minor_locator(plt.NullLocator())
+    for y0, y1, base in spans:
+        ax.plot([base, base], [y0, y1], color=INK2, lw=1.2, zorder=1)
+    for y, v, base in rows:
+        ax.plot([base, v], [y, y], color=TIME_BAR, lw=2, solid_capstyle="round", zorder=2)
+        ax.scatter([v], [y], s=34, color=TIME_DOT, ec=SURFACE, lw=1.5, zorder=3)
+        r = v / base
+        txt = f"{v:.1f} ms (×{r:.0f})" if r >= 1.95 else f"{v:.1f} ms (×{r:.1f})"
+        ax.text(max(v, base) * 1.12, y, txt, va="center", ha="left", fontsize=7, color=INK2)
+    ax.set_title("Avg Time per Inference\n× = vs the same model, no defence", loc="left", fontsize=9)
+    ax.set_xlabel("Avg Time per Inference (ms, log scale)\npre chain + model + post chain")
+
+
+def plot_top(scope="global", n=25, results_dir=RESULTS, metric=METRIC, max_clean_drop=MAX_CLEAN_DROP, tags=None):
+    """The best tested rows by Mean Macro (attacked), over the models in tags (default: all 5).
+    scope="global": the top n rows over all models together.
+    scope="per_model": the top n // len(tags) rows of each model (n=25 -> top 5 of each model).
+    Rows are grouped by model, then by the defences in the pre chain, then by pre chain. Each model group
+    has its own gray line at that model with no defence; the numbers are the change from it."""
+    tags = sorted(tags or TAGS, key=lambda t: list(MODEL_IDS).index(t) if t in MODEL_IDS else len(MODEL_IDS))
+    marked = set()
+    if scope == "global":
+        Rs, ranked, dropped = rank_rows(tags, results_dir, metric, max_clean_drop, skip=())
+        top, total = ranked[:n], len(ranked) + dropped
+        n_tie = sum(1 for r in ranked if r[0] == top[-1][0])
+        tie = (f" {n_tie} rows share rank {top[-1][0]}; the {sum(1 for r in top if r[0] == top[-1][0])} with the "
+               f"fewest defences are shown." if n_tie > sum(1 for r in top if r[0] == top[-1][0]) else "")
+        what = f"global top {len(top)}"
+    elif scope == "per_model":
+        k = n // len(tags)
+        Rs, top, dropped, total, tie = {}, [], 0, 0, ""
+        for t in tags:
+            R1, ranked, d = rank_rows([t], results_dir, metric, max_clean_drop, skip=())
+            Rs.update(R1); dropped += d; total += len(ranked) + d
+            must = {(t, p, q) for p, q in REPORT_ROWS.get(t, [])}
+            missing = must - {(tt, p, q) for _, tt, p, q in ranked}
+            assert not missing, f"report rows not ranked (not tested, or left out by the clean rule): {missing}"
+            marked |= must
+            picks = [r for r in ranked if (r[1], r[2], r[3]) in must]
+            picks += [r for r in ranked if (r[1], r[2], r[3]) not in must][:max(0, k - len(picks))]
+            top += sorted(picks, key=ranked.index)
+        what = f"top {k} per model"
+        tie = " ★ = row in the report tables; always shown, other rows by rank."
+    else:
+        raise ValueError("scope must be 'global' or 'per_model'")
+    R0 = next(iter(Rs.values()))
+    L = _top_layout(top, Rs, marked)
+    spans = {s: [(y0, y1, Rs[t].value(NONE, NONE, s)) for y0, y1, t in L["spans"]] for s, _ in SETS}
+    lims = [Rs[t].value(p, q, s) for _, t, p, q in top for s, _ in SETS] + \
+           [b for s, _ in SETS for _, _, b in spans[s]]
+    lim = (min(0.0, min(lims)), max(1.0, max(lims)))
+    m = metric_label(metric)
+    with plt.rc_context(STYLE):
+        fig, axes = _figure(L["height"])
+        for yy, _, _, _, rank in L["rows"]:
+            if rank == 1:
+                for ax in axes:
+                    ax.axhspan(yy - 0.5, yy + 0.5, color=TOP_BAND, zorder=0, lw=0)
+        for ax, (s, title) in zip(axes, SETS):
+            rows = [(yy, Rs[t].value(p, q, s), Rs[t].value(NONE, NONE, s)) for yy, t, p, q, _ in L["rows"]]
+            rings = {yy: Rs[t].value(p, NONE, s) for yy, t, p, q, _ in L["rows"] if q != NONE and p != NONE
+                     and (p, NONE) in Rs[t].rows}
+            xl = f"Mean {m} (3 attacked sets)" if s == MEAN_ATTACKED else m
+            _value_panel_rows(ax, R0.sign, title, rows, spans[s], rings, lim, xl)
+        _time_panel_rows(axes[-1], [(yy, Rs[t].ms(p, q), Rs[t].ms(NONE, NONE)) for yy, t, p, q, _ in L["rows"]],
+                         [(y0, y1, Rs[t].ms(NONE, NONE)) for y0, y1, t in L["spans"]])
+        _finish(axes, L["ticks"], L["labels"], L["pre"], L["sets"], L["height"] + 0.8, L["seps"])
+        for tl, y in zip(axes[0].get_yticklabels(), L["ticks"]):
+            if y in L["model"]:
+                tl.set_fontweight("bold"); tl.set_fontsize(9.5); tl.set_color(INK)
+        notes = (f"Score = mean {m} over PGD, Pixle and PGD + Pixle. {total} tested rows ranked; {dropped} left out "
+                 f"(clean {m} more than {max_clean_drop:.1%} below the same model with no defence).\n"
+                 f"Ties share a rank (fewer defences first, then faster). Shaded = rank 1.{tie} "
+                 f"Ranks come from the test sets (not a tuned setting).\n" + TIME_NOTE)
+        notes = "\n".join(textwrap.fill(par, 200) for par in notes.split("\n"))
+        _header(fig, R0, f"Best defence combinations by Mean Macro (attacked): {what}", notes, rings=True,
+                extra=0.16 * (notes.count("\n") - 1),
+                ref="the same model with no defence (one line for each model group)", scores=True)
+    return fig
+
+
+def save_top(out=".", n=25, results_dir=RESULTS, metric=METRIC):
+    """Saves both top-n charts as top<n>_global.png and top<n>_per_model.png."""
+    figs = {}
+    for scope in ("global", "per_model"):
+        figs[scope] = plot_top(scope, n, results_dir, metric)
+        figs[scope].savefig(Path(out) / f"top{n}_{scope}.png", dpi=160, bbox_inches="tight")
+    return figs
+
+
 def plot_all(tag, results_dir=RESULTS, out=None, metric=METRIC):
     """The pre, post and combination charts for one model, as {"pre", "post", "combination"} figures.
     With out=<folder>, also saves them as <model>_pre.png, <model>_post.png and <model>_combination.png,
@@ -408,7 +635,17 @@ def main():
     ap.add_argument("--results", default=str(RESULTS), help="folder with <metric>.txt and runtime.txt")
     ap.add_argument("--metric", default=METRIC, help="metric file name without .txt (default f1_macro)")
     ap.add_argument("--out", help="save PNGs to this folder instead of opening them")
+    ap.add_argument("--top", type=int, metavar="N", help="draw only the two top-N charts (plot_top), for example 25")
     args = ap.parse_args()
+    if args.top:
+        if args.out:
+            save_top(args.out, args.top, args.results, args.metric)
+            print(f"saved top{args.top}_global.png and top{args.top}_per_model.png to {args.out}")
+        else:
+            plot_top("global", args.top, args.results, args.metric)
+            plot_top("per_model", args.top, args.results, args.metric)
+            plt.show()
+        return
     tags = list(TAGS) if args.tag == "all" else [args.tag]
     for tag in tags:
         plot_all(tag, args.results, args.out, args.metric)
