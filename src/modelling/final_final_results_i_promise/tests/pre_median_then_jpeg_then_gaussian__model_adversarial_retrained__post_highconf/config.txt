@@ -1,0 +1,21 @@
+TEST CONFIGURATION
+==================
+Preprocessing: median -> jpeg -> gaussian
+Preprocessing Details: median_smoothing(kernel=7) -> jpeg_compression(quality=90) -> gaussian_smoothing(sigma=4, samples=32, seed=4266)
+Model: adversarial_retrained
+Model Path: /app/runs/best_adversarial_retrained.keras
+Postprocessing: highconf
+Postprocessing Details: high_confidence(cutoff=0.1)
+Datasets: clean_test, pgd_test, pixle_test, pgdpixle_test
+Seed: 4266
+Warmup Runs: 5
+Number of Runs: 3
+
+RUNTIME SUMMARY
+===============
+Total Runtime (s): 212.102402
+Average Runtime per Run (s): 70.700801
+Total Runs: 3
+Total Inferences per Run: 460
+Average Time per Inference (s): 0.153697
+Average Time per Inference (ms): 153.6974

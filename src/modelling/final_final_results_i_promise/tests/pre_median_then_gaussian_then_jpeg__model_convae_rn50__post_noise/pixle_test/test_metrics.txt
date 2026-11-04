@@ -1,0 +1,87 @@
+OVERALL TEST METRICS
+====================
+preprocessing: median -> gaussian -> jpeg
+preprocessing_details: median_smoothing(kernel=7) -> gaussian_smoothing(sigma=4, samples=32, seed=4266) -> jpeg_compression(quality=90)
+model: convae_rn50
+postprocessing: noise
+postprocessing_details: gaussian_noise(scale=0.2)
+dataset: pixle_test
+seed: 4266
+warmup_runs: 5
+num_runs: 3
+dataset_total_runtime_s: 65.657920
+dataset_avg_runtime_s: 21.885973
+dataset_avg_time_per_inference_s: 0.190313
+number_of_test_images: 115
+cross_entropy_loss: 0.391586
+accuracy: 1.000000
+balanced_accuracy: 1.000000
+top_3_accuracy: 1.000000
+top_5_accuracy: 1.000000
+matthews_correlation_coefficient: 1.000000
+cohen_kappa: 1.000000
+precision_macro: 1.000000
+recall_macro: 1.000000
+f1_macro: 1.000000
+precision_micro: 1.000000
+recall_micro: 1.000000
+f1_micro: 1.000000
+precision_weighted: 1.000000
+recall_weighted: 1.000000
+f1_weighted: 1.000000
+roc_auc_macro_ovr: 1.000000
+roc_auc_weighted_ovr: 1.000000
+average_precision_macro: 1.000000
+average_precision_weighted: 1.000000
+
+PER-CLASS METRICS
+=================
+
+10_MPH
+  precision: 1.000000
+  recall: 1.000000
+  specificity: 1.000000
+  f1: 1.000000
+  support: 3
+
+20_MPH
+  precision: 1.000000
+  recall: 1.000000
+  specificity: 1.000000
+  f1: 1.000000
+  support: 12
+
+30_MPH
+  precision: 1.000000
+  recall: 1.000000
+  specificity: 1.000000
+  f1: 1.000000
+  support: 20
+
+40_MPH
+  precision: 1.000000
+  recall: 1.000000
+  specificity: 1.000000
+  f1: 1.000000
+  support: 35
+
+50_MPH
+  precision: 1.000000
+  recall: 1.000000
+  specificity: 1.000000
+  f1: 1.000000
+  support: 14
+
+60_MPH
+  precision: 1.000000
+  recall: 1.000000
+  specificity: 1.000000
+  f1: 1.000000
+  support: 13
+
+70_MPH
+  precision: 1.000000
+  recall: 1.000000
+  specificity: 1.000000
+  f1: 1.000000
+  support: 18
