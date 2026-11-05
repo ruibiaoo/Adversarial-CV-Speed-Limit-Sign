@@ -1,0 +1,20 @@
+TEST CONFIGURATION
+==================
+Preprocessing: convae
+Preprocessing Details: convae(model_path=/app/runs/convae_adv2clean_aug_v6.keras)
+Model: baseline
+Model Path: /app/runs/best_baseline.keras
+Postprocessing: noise -> highconf -> revsig
+Postprocessing Details: gaussian_noise(scale=0.2) -> high_confidence(cutoff=0.1) -> reverse_sigmoid(beta=1.0, gamma=0.5)
+Datasets: clean_test, pgd_test, pixle_test, pgdpixle_test
+Seed: 4266
+Number of Runs: 10
+
+RUNTIME SUMMARY
+===============
+Total Runtime (s): 31.516479
+Average Runtime per Run (s): 3.151648
+Total Runs: 10
+Total Inferences per Run: 460
+Average Time per Inference (s): 0.006851
+Average Time per Inference (ms): 6.8514

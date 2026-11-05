@@ -1,0 +1,9 @@
+Metric: matthews_correlation_coefficient
+
+Preprocessing  Model                  Postprocessing  clean_test   pgd_test  pixle_test  pgdpixle_test
+-------------  ---------------------  --------------  ----------  ---------  ----------  -------------
+none           baseline               none              1.000000  -0.175100    0.535285      -0.156549
+none           adversarial_retrained  none              1.000000   0.989401    0.989401       0.989401
+none           robust                 none              0.968896   0.968896    0.968896       0.968896
+none           grl                    none              0.978878   0.968413    0.978878       0.978835
+none           convae_rn50            none              1.000000   0.989420    1.000000       0.989420

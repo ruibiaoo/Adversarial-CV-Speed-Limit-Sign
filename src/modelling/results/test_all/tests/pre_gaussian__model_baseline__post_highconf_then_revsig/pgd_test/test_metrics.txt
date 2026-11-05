@@ -1,0 +1,86 @@
+OVERALL TEST METRICS
+====================
+preprocessing: gaussian
+preprocessing_details: gaussian_smoothing(sigma=4, samples=32, seed=4266)
+model: baseline
+postprocessing: highconf -> revsig
+postprocessing_details: high_confidence(cutoff=0.1) -> reverse_sigmoid(beta=1.0, gamma=0.5)
+dataset: pgd_test
+seed: 4266
+num_runs: 10
+dataset_total_runtime_s: 318.209012
+dataset_avg_runtime_s: 31.820901
+dataset_avg_time_per_inference_s: 0.276703
+number_of_test_images: 115
+cross_entropy_loss: 1.945928
+accuracy: 0.000000
+balanced_accuracy: 0.000000
+top_3_accuracy: 0.313043
+top_5_accuracy: 0.852174
+matthews_correlation_coefficient: -0.175100
+cohen_kappa: -0.160495
+precision_macro: 0.000000
+recall_macro: 0.000000
+f1_macro: 0.000000
+precision_micro: 0.000000
+recall_micro: 0.000000
+f1_micro: 0.000000
+precision_weighted: 0.000000
+recall_weighted: 0.000000
+f1_weighted: 0.000000
+roc_auc_macro_ovr: 0.416501
+roc_auc_weighted_ovr: 0.415504
+average_precision_macro: 0.142857
+average_precision_weighted: 0.186541
+
+PER-CLASS METRICS
+=================
+
+10_MPH
+  precision: 0.000000
+  recall: 0.000000
+  specificity: 0.919643
+  f1: 0.000000
+  support: 3
+
+20_MPH
+  precision: 0.000000
+  recall: 0.000000
+  specificity: 0.902913
+  f1: 0.000000
+  support: 12
+
+30_MPH
+  precision: 0.000000
+  recall: 0.000000
+  specificity: 0.947368
+  f1: 0.000000
+  support: 20
+
+40_MPH
+  precision: 0.000000
+  recall: 0.000000
+  specificity: 0.825000
+  f1: 0.000000
+  support: 35
+
+50_MPH
+  precision: 0.000000
+  recall: 0.000000
+  specificity: 0.544554
+  f1: 0.000000
+  support: 14
+
+60_MPH
+  precision: 0.000000
+  recall: 0.000000
+  specificity: 0.784314
+  f1: 0.000000
+  support: 13
+
+70_MPH
+  precision: 0.000000
+  recall: 0.000000
+  specificity: 0.907216
+  f1: 0.000000
+  support: 18
