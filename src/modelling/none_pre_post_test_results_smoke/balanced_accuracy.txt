@@ -1,9 +1,0 @@
-Metric: balanced_accuracy
-
-Preprocessing  Model                  Postprocessing  clean_test  pgd_test  pixle_test  pgdpixle_test
--------------  ---------------------  --------------  ----------  --------  ----------  -------------
-none           baseline               none              1.000000  0.000000    0.630883       0.000000
-none           adversarial_retrained  none              1.000000  0.989011    0.989011       0.989011
-none           robust                 none              0.987755  0.987755    0.987755       0.987755
-none           grl                    none              0.978022  0.973940    0.978022       0.984929
-none           convae_rn50            none              1.000000  0.995918    1.000000       0.995918

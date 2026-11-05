@@ -1,9 +1,0 @@
-Metric: runtime
-
-Preprocessing  Model                  Postprocessing  Total Runtime (s)  Avg Runtime (s)  Total Runs  Inferences per Run  Avg Time per Inference (s)  Avg Time per Inference (ms)
--------------  ---------------------  --------------  -----------------  ---------------  ----------  ------------------  --------------------------  ---------------------------
-none           baseline               none                     8.012375         2.670792           3                 460                    0.005806                       5.8061
-none           adversarial_retrained  none                     8.050098         2.683366           3                 460                    0.005833                       5.8334
-none           robust                 none                     8.320701         2.773567           3                 460                    0.006029                       6.0295
-none           grl                    none                     8.279489         2.759830           3                 460                    0.006000                       5.9996
-none           convae_rn50            none                     9.551237         3.183746           3                 460                    0.006921                       6.9212

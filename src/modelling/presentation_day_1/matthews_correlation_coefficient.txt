@@ -1,7 +1,0 @@
-Metric: matthews_correlation_coefficient
-
-Preprocessing   Model     Postprocessing  clean_test   pgd_test  pixle_test  pgdpixle_test
---------------  --------  --------------  ----------  ---------  ----------  -------------
-none            baseline  none              1.000000  -0.175100    0.535285      -0.156549
-jpeg -> median  baseline  none              1.000000   0.750271    1.000000       0.802848
-median -> jpeg  baseline  none              1.000000   0.675462    1.000000       0.768279

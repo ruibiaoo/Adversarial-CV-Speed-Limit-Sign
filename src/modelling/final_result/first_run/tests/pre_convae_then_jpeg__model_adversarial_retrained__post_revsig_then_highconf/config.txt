@@ -1,0 +1,21 @@
+TEST CONFIGURATION
+==================
+Preprocessing: convae -> jpeg
+Preprocessing Details: convae(model_path=/app/runs/convae_adv2clean_aug_v6.keras) -> jpeg_compression(quality=90)
+Model: adversarial_retrained
+Model Path: /app/runs/best_adversarial_retrained.keras
+Postprocessing: revsig -> highconf
+Postprocessing Details: reverse_sigmoid(beta=1.0, gamma=0.5) -> high_confidence(cutoff=0.1)
+Datasets: clean_test, pgd_test, pixle_test, pgdpixle_test
+Seed: 4266
+Warmup Runs: 5
+Number of Runs: 3
+
+RUNTIME SUMMARY
+===============
+Total Runtime (s): 12.476591
+Average Runtime per Run (s): 4.158864
+Total Runs: 3
+Total Inferences per Run: 460
+Average Time per Inference (s): 0.009041
+Average Time per Inference (ms): 9.0410

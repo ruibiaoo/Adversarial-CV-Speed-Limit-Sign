@@ -1,9 +1,0 @@
-Metric: precision_weighted
-
-Preprocessing  Model                  Postprocessing  clean_test  pgd_test  pixle_test  pgdpixle_test
--------------  ---------------------  --------------  ----------  --------  ----------  -------------
-none           baseline               none              1.000000  0.000000    0.697701       0.000000
-none           adversarial_retrained  none              1.000000  0.991884    0.991884       0.991884
-none           robust                 none              0.977640  0.977640    0.977640       0.977640
-none           grl                    none              0.983602  0.976232    0.983602       0.983646
-none           convae_rn50            none              1.000000  0.991762    1.000000       0.991762

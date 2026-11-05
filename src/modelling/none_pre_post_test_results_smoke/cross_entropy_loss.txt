@@ -1,9 +1,0 @@
-Metric: cross_entropy_loss
-
-Preprocessing  Model                  Postprocessing  clean_test   pgd_test  pixle_test  pgdpixle_test
--------------  ---------------------  --------------  ----------  ---------  ----------  -------------
-none           baseline               none              0.028246  15.942384    0.724480      15.942384
-none           adversarial_retrained  none              0.005603   0.021784    0.009944       0.017442
-none           robust                 none              0.045120   0.049983    0.045780       0.049190
-none           grl                    none              0.064806   0.086008    0.063553       0.075671
-none           convae_rn50            none              0.005609   0.020262    0.005330       0.018766

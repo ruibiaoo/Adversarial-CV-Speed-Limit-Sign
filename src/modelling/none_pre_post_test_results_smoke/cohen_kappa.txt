@@ -1,9 +1,0 @@
-Metric: cohen_kappa
-
-Preprocessing  Model                  Postprocessing  clean_test   pgd_test  pixle_test  pgdpixle_test
--------------  ---------------------  --------------  ----------  ---------  ----------  -------------
-none           baseline               none              1.000000  -0.160495    0.525603      -0.148003
-none           adversarial_retrained  none              1.000000   0.989309    0.989309       0.989309
-none           robust                 none              0.968082   0.968082    0.968082       0.968082
-none           grl                    none              0.978605   0.967964    0.978605       0.978652
-none           convae_rn50            none              1.000000   0.989327    1.000000       0.989327

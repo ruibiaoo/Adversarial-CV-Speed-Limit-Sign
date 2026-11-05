@@ -1,7 +1,0 @@
-Metric: precision_micro
-
-Preprocessing   Model     Postprocessing  clean_test  pgd_test  pixle_test  pgdpixle_test
---------------  --------  --------------  ----------  --------  ----------  -------------
-none            baseline  none              1.000000  0.000000    0.600000       0.000000
-jpeg -> median  baseline  none              1.000000  0.791304    1.000000       0.834783
-median -> jpeg  baseline  none              1.000000  0.730435    1.000000       0.808696

@@ -1,0 +1,87 @@
+OVERALL TEST METRICS
+====================
+preprocessing: convae -> jpeg -> median -> gaussian
+preprocessing_details: convae(model_path=/app/runs/convae_adv2clean_aug_v6.keras) -> jpeg_compression(quality=90) -> median_smoothing(kernel=7) -> gaussian_smoothing(sigma=4, samples=32, seed=4266)
+model: baseline
+postprocessing: noise -> highconf -> revsig
+postprocessing_details: gaussian_noise(scale=0.2) -> high_confidence(cutoff=0.1) -> reverse_sigmoid(beta=1.0, gamma=0.5)
+dataset: pixle_test
+seed: 4266
+warmup_runs: 5
+num_runs: 3
+dataset_total_runtime_s: 56.436537
+dataset_avg_runtime_s: 18.812179
+dataset_avg_time_per_inference_s: 0.163584
+number_of_test_images: 115
+cross_entropy_loss: 1.764908
+accuracy: 0.895652
+balanced_accuracy: 0.904884
+top_3_accuracy: 0.904348
+top_5_accuracy: 0.991304
+matthews_correlation_coefficient: 0.876466
+cohen_kappa: 0.873371
+precision_macro: 0.850907
+recall_macro: 0.904884
+f1_macro: 0.855008
+precision_micro: 0.895652
+recall_micro: 0.895652
+f1_micro: 0.895652
+precision_weighted: 0.934369
+recall_weighted: 0.895652
+f1_weighted: 0.906288
+roc_auc_macro_ovr: 0.951130
+roc_auc_weighted_ovr: 0.942437
+average_precision_macro: 0.920555
+average_precision_weighted: 0.914355
+
+PER-CLASS METRICS
+=================
+
+10_MPH
+  precision: 0.428571
+  recall: 1.000000
+  specificity: 0.964286
+  f1: 0.600000
+  support: 3
+
+20_MPH
+  precision: 0.611111
+  recall: 0.916667
+  specificity: 0.932039
+  f1: 0.733333
+  support: 12
+
+30_MPH
+  precision: 1.000000
+  recall: 0.850000
+  specificity: 1.000000
+  f1: 0.918919
+  support: 20
+
+40_MPH
+  precision: 1.000000
+  recall: 0.914286
+  specificity: 1.000000
+  f1: 0.955224
+  support: 35
+
+50_MPH
+  precision: 0.916667
+  recall: 0.785714
+  specificity: 0.990099
+  f1: 0.846154
+  support: 14
+
+60_MPH
+  precision: 1.000000
+  recall: 0.923077
+  specificity: 1.000000
+  f1: 0.960000
+  support: 13
+
+70_MPH
+  precision: 1.000000
+  recall: 0.944444
+  specificity: 1.000000
+  f1: 0.971429
+  support: 18

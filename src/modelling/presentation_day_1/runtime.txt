@@ -1,7 +1,0 @@
-Metric: runtime
-
-Preprocessing   Model     Postprocessing  Total Runtime (s)  Avg Runtime (s)  Total Runs  Inferences per Run  Avg Time per Inference (s)  Avg Time per Inference (ms)
---------------  --------  --------------  -----------------  ---------------  ----------  ------------------  --------------------------  ---------------------------
-none            baseline  none                     7.774649         2.591550           3                 460                    0.005634                       5.6338
-jpeg -> median  baseline  none                    29.760678         9.920226           3                 460                    0.021566                      21.5657
-median -> jpeg  baseline  none                    28.740199         9.580066           3                 460                    0.020826                      20.8262

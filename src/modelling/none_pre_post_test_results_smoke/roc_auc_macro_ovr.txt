@@ -1,9 +1,0 @@
-Metric: roc_auc_macro_ovr
-
-Preprocessing  Model                  Postprocessing  clean_test  pgd_test  pixle_test  pgdpixle_test
--------------  ---------------------  --------------  ----------  --------  ----------  -------------
-none           baseline               none              1.000000  0.436536    0.954696       0.419731
-none           adversarial_retrained  none              1.000000  0.999798    1.000000       1.000000
-none           robust                 none              1.000000  1.000000    1.000000       1.000000
-none           grl                    none              0.999798  0.999475    0.999798       0.999531
-none           convae_rn50            none              1.000000  1.000000    1.000000       1.000000
