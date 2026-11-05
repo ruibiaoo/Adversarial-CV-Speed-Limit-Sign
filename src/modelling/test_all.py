@@ -766,19 +766,44 @@ def main():
             convae_model = load_convae(convae_resolved_path, img_size=image_size)
             convae_model.trainable = False
 
-        # Warm up the loaded model (and ConvAE) for `warmup_runs` passes so TF graph compilation
-        # and cuDNN autotuning do not skew the first combination's timing
-        first_ds = next(iter(loaded_datasets.values()))
-        if warmup_runs > 0 and first_ds["batches"]:
-            print(f"Running {warmup_runs} warmup pass(es) for model '{model_name}' ...", flush=True)
-            warmup_raw = np.asarray(first_ds["batches"][0], dtype=np.float32)
-            warmup_batch = preprocess_input(warmup_raw.copy())
-            warmup_clf = ttd._ClassOutput(model)
-            warmup_01 = np.clip(warmup_raw / 255.0, 0.0, 1.0) if convae_model is not None else None
-            for _ in range(warmup_runs):
-                _ = warmup_clf.predict_on_batch(warmup_batch)
-                if convae_model is not None:
-                    _ = convae_model.predict_on_batch(warmup_01)
+        # Warm up the loaded model (and ConvAE) across all unique batch sizes so TF graph
+        # compilation and cuDNN autotuning (including on the final remainder batch) do not
+        # skew the first run's timing.
+        if warmup_runs > 0:
+            unique_raw_batches: dict[int, np.ndarray] = {}
+            for ds_info in loaded_datasets.values():
+                for batch in ds_info["batches"]:
+                    b_size = int(len(batch))
+                    if b_size > 0 and b_size not in unique_raw_batches:
+                        unique_raw_batches[b_size] = np.asarray(batch, dtype=np.float32)
+
+            if "gaussian_smoothing" in pre_params and unique_raw_batches:
+                n_samples = int(pre_params["gaussian_smoothing"].get("samples", getattr(pre_module, "SMOOTHING_SAMPLES", 32)))
+                sample_img = next(iter(unique_raw_batches.values()))[:1]
+                for g_bsize in (1, 2, n_samples, 2 * n_samples):
+                    if g_bsize > 0 and g_bsize not in unique_raw_batches:
+                        unique_raw_batches[g_bsize] = np.repeat(sample_img, g_bsize, axis=0)
+
+            if unique_raw_batches:
+                shapes_str = ", ".join(str(b) for b in sorted(unique_raw_batches.keys(), reverse=True))
+                print(
+                    f"Running {warmup_runs} warmup pass(es) for model '{model_name}' "
+                    f"(batch sizes: {shapes_str}) ...",
+                    flush=True,
+                )
+                warmup_clf = ttd._ClassOutput(model)
+                warmup_inputs = [
+                    (
+                        preprocess_input(raw_b.copy()),
+                        np.clip(raw_b / 255.0, 0.0, 1.0) if convae_model is not None else None,
+                    )
+                    for raw_b in unique_raw_batches.values()
+                ]
+                for _ in range(warmup_runs):
+                    for warmup_batch, warmup_01 in warmup_inputs:
+                        _ = warmup_clf.predict_on_batch(warmup_batch)
+                        if convae_model is not None and warmup_01 is not None:
+                            _ = convae_model.predict_on_batch(warmup_01)
 
         for pre_chain in pre_chains:
             if CONVAE_STEP in pre_chain and model_has_embedded_convae and skip_duplicate_convae:

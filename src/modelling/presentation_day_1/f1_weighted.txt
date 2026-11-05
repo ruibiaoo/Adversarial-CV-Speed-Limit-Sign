@@ -1,0 +1,7 @@
+Metric: f1_weighted
+
+Preprocessing   Model     Postprocessing  clean_test  pgd_test  pixle_test  pgdpixle_test
+--------------  --------  --------------  ----------  --------  ----------  -------------
+none            baseline  none              1.000000  0.000000    0.626106       0.000000
+jpeg -> median  baseline  none              1.000000  0.791238    1.000000       0.834117
+median -> jpeg  baseline  none              1.000000  0.732066    1.000000       0.808003

@@ -1,0 +1,7 @@
+Metric: average_precision_weighted
+
+Preprocessing   Model     Postprocessing  clean_test  pgd_test  pixle_test  pgdpixle_test
+--------------  --------  --------------  ----------  --------  ----------  -------------
+none            baseline  none              1.000000  0.154554    0.801175       0.147688
+jpeg -> median  baseline  none              1.000000  0.836302    1.000000       0.903132
+median -> jpeg  baseline  none              1.000000  0.777815    1.000000       0.843024

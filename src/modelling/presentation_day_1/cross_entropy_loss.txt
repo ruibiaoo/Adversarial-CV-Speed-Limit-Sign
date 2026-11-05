@@ -1,0 +1,7 @@
+Metric: cross_entropy_loss
+
+Preprocessing   Model     Postprocessing  clean_test   pgd_test  pixle_test  pgdpixle_test
+--------------  --------  --------------  ----------  ---------  ----------  -------------
+none            baseline  none              0.028246  15.942384    0.724480      15.942384
+jpeg -> median  baseline  none              0.019467   0.983545    0.019746       0.653471
+median -> jpeg  baseline  none              0.022014   1.415527    0.022006       0.981051
