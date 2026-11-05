@@ -1,0 +1,7 @@
+Metric: average_precision_macro
+
+Preprocessing   Model     Postprocessing  clean_test  pgd_test  pixle_test  pgdpixle_test
+--------------  --------  --------------  ----------  --------  ----------  -------------
+none            baseline  none              1.000000  0.131736    0.768637       0.120425
+jpeg -> median  baseline  none              1.000000  0.849702    1.000000       0.912639
+median -> jpeg  baseline  none              1.000000  0.799583    1.000000       0.861114
